@@ -43,7 +43,6 @@ PSLSRC = \
     psl/rkisp1/workers/OutputFrameWorker.cpp \
     psl/rkisp1/workers/StatisticsWorker.cpp \
     psl/rkisp1/workers/ParameterWorker.cpp \
-    psl/rkisp1/workers/RKISP1AicToFwEncoder.cpp \
     psl/rkisp1/RuntimeParamsHelper.cpp \
     psl/rkisp1/RKISP1ISPPipe.cpp \
     psl/rkisp1/MediaCtlHelper.cpp \
