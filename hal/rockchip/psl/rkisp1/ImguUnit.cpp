@@ -445,8 +445,7 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
             mFirstWorkers.push_back(worker);
         } else if (it.first == IMGU_NODE_STAT) {
             std::shared_ptr<StatisticsWorker> statWorker =
-                std::make_shared<StatisticsWorker>(it.second, mCameraId,
-                    mAfFilterBuffPool, mRgbsGridBuffPool);
+                std::make_shared<StatisticsWorker>(it.second, mCameraId);
             mListenerDeviceWorkers.push_back(statWorker.get());
             videoConfig->deviceWorkers.push_back(statWorker);
             videoConfig->pollableWorkers.push_back(statWorker);
