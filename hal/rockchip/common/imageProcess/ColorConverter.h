@@ -24,8 +24,6 @@ NAMESPACE_DECLARATION {
 void convertYV12ToNV21(int width, int height, int srcStride, int dstStride, void *src, void *dst);
 void copyYV12ToYV12(int width, int height, int srcStride, int dstStride, void *src, void *dst);
 
-void trimConvertNV12ToNV21(int width, int height, int srcStride, void *src, void *dst);
-
 void convertNV12ToYV12(int width, int height, int srcStride, void *src, void *dst);
 void align16ConvertNV12ToYV12(int width, int height, int srcStride, void *src, void *dst);
 
