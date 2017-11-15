@@ -45,7 +45,6 @@ PSLSRC = \
     psl/rkisp1/workers/ParameterWorker.cpp \
     psl/rkisp1/workers/RKISP1AicToFwEncoder.cpp \
     psl/rkisp1/RuntimeParamsHelper.cpp \
-    psl/rkisp1/SkyCamProxy.cpp \
     psl/rkisp1/RKISP1ISPPipe.cpp \
     psl/rkisp1/MediaCtlHelper.cpp \
     common/platformdata/gc/FormatUtils.cpp \
@@ -64,10 +63,7 @@ PSLCPPFLAGS = \
     -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F \
     -DMACRO_KBL_AIC
 
-if !REMOTE_3A_SERVER
-PSLSRC += \
-    psl/rkisp1/SkyCamLocalProxy.cpp
-else
+if REMOTE_3A_SERVER
 PSLCPPFLAGS += \
     -DREMOTE_3A_SERVER \
     -I$(top_srcdir)/psl/rkisp1/ipc
