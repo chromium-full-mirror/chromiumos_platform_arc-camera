@@ -124,6 +124,9 @@ STRICTED_CPPFLAGS = \
 libcamerahal_la_CPPFLAGS = $(CPPHACKS) \
                            $(STRICTED_CPPFLAGS)
 
+# Enable large file support.
+libcamerahal_la_CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+
 #Namespace Declaration
 libcamerahal_la_CPPFLAGS += -DNAMESPACE_DECLARATION=namespace\ android\ {\namespace\ camera2
 libcamerahal_la_CPPFLAGS += -DNAMESPACE_DECLARATION_END=}
