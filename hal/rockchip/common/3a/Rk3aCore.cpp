@@ -25,7 +25,6 @@
 #include <utils/Errors.h>
 #include <math.h>
 #include <limits.h> // SCHAR_MAX, SCHAR_MIN
-#include <ia_log.h>
 
 #include "PlatformData.h"
 #include "LogHelper.h"

@@ -24,7 +24,6 @@
 
 #include <utils/Errors.h>
 #include <math.h>
-#include <ia_log.h>
 #include "LogHelper.h"
 
 NAMESPACE_DECLARATION {
