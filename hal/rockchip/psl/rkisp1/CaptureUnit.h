@@ -32,7 +32,6 @@
 #include "InputSystem.h"
 #include "SyncManager.h"
 #include "LensHw.h"
-#include <linux/intel-ipu3.h>
 
 #ifndef __CAPTURE_UNIT_H__
 #define __CAPTURE_UNIT_H__
@@ -90,7 +89,6 @@ public:
         unsigned int     sequence;
         std::shared_ptr<CaptureBuffer> pixelBuffer;   /**< Single buffer for output from CaptureUnit. To be identified by CaptureEventType  */
         std::shared_ptr<RKISP1CapturedStatistics> stats;
-        std::shared_ptr<ipu3_uapi_params> param;
         std::shared_ptr<CameraBuffer> yuvBuffer;
         unsigned int     reqId;
         rk_aiq_exposure_sensor_descriptor exposureDesc;

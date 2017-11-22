@@ -25,7 +25,6 @@
 #include "GraphConfig.h"
 #include "tasks/ExecuteTaskBase.h"
 #include "Camera3Request.h"
-#include <linux/intel-ipu3.h>
 
 namespace android {
 namespace camera2 {

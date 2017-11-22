@@ -2144,9 +2144,6 @@ status_t GraphConfig::getMediaCtlData(MediaCtlConfig *mediaCtlConfig)
     addFormatParams(csi2, csiBEOutW, csiBEOutH, 0, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
     addFormatParams(csi2, csiBEOutW, csiBEOutH, 1, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
 
-    // Imgu cio2 format
-    addFormatParams(mCSIBE, csiBEOutW, csiBEOutH, 0, V4L2_PIX_FMT_IPU3_SGRBG10, 0, mediaCtlConfig);
-
     /* Start populating selections into mediaCtlConfig
      * entity name, width, height, left crop, top crop, target, pad, config */
     addSelectionParams(sourceInfo.pa.name,
@@ -2273,8 +2270,6 @@ status_t GraphConfig::getImguMediaCtlData(MediaCtlConfig *mediaCtlConfig,
 
         if (fourccFormat == "NV12")
             format = V4L2_PIX_FMT_NV12;
-        else if (fourccFormat == "CIO2")
-            format = V4L2_PIX_FMT_IPU3_SGRBG10;
         else if (fourccFormat == "YUYV")
             format = V4L2_PIX_FMT_YUYV;
         else

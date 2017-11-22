@@ -34,7 +34,6 @@
 #include "workers/FrameWorker.h"
 #include "MediaCtlHelper.h"
 #include "workers/ParameterWorker.h"
-#include <linux/intel-ipu3.h>
 
 namespace android {
 namespace camera2 {
