@@ -28,16 +28,9 @@ lib_LTLIBRARIES = \
 if REMOTE_3A_SERVER
 3ASRC += psl/rkisp1/ipc/client/Rk3aCommon.cpp \
          psl/rkisp1/ipc/client/Rk3aCoordinate.cpp \
-         psl/rkisp1/ipc/client/Rk3aAiq.cpp \
-         psl/rkisp1/ipc/client/Rk3aCmc.cpp \
-         psl/rkisp1/ipc/client/Rk3aExc.cpp \
-         psl/rkisp1/ipc/client/Rk3aMkn.cpp
+         psl/rkisp1/ipc/client/Rk3aAiq.cpp
 else
-3ASRC += common/3awrapper/Rk3aCoordinate.cpp \
-         common/3awrapper/Rk3aAiq.cpp \
-         common/3awrapper/Rk3aCmc.cpp \
-         common/3awrapper/Rk3aExc.cpp \
-         common/3awrapper/Rk3aMkn.cpp
+3ASRC += common/3awrapper/Rk3aAiq.cpp
 endif
 
 AALSRC = AAL/Camera3HAL.cpp \
@@ -58,8 +51,7 @@ V4L2SRC = common/v4l2dev/v4l2devicebase.cpp \
           common/v4l2dev/v4l2subdevice.cpp \
           common/v4l2dev/v4l2videonode.cpp
 
-PLATFORMDATASRC = common/platformdata/CameraConf.cpp \
-                  common/platformdata/CameraMetadataHelper.cpp \
+PLATFORMDATASRC = common/platformdata/CameraMetadataHelper.cpp \
                   common/platformdata/CameraProfiles.cpp \
                   common/platformdata/ChromeCameraProfiles.cpp \
                   common/platformdata/Metadata.cpp \

@@ -24,10 +24,7 @@
 
 #include <utils/Errors.h>
 #include <math.h>
-#include <ia_cmc_parser.h>
-#include <ia_exc.h>
 #include <ia_log.h>
-#include <ia_mkn_encoder.h>
 #include "LogHelper.h"
 
 NAMESPACE_DECLARATION {

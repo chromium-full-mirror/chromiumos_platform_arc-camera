@@ -27,7 +27,6 @@
 #define _IA_AIQ_TYPES_H_
 
 #include "ia_types.h"
-#include "ia_cmc_types.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -677,14 +676,6 @@ typedef struct
 } rk_aiq_color_channels_lut;
 
 /*!
- * \brief Shading Adaptor light source weight and its type.
- */
-typedef struct {
-    float weight;
-    cmc_light_source source_type;
-} light_source_t;
-
-/*!
 * \brief Advanced Color Correction Matrix Structure Returned by Parameter Adaptor.
 */
 typedef struct {
@@ -719,7 +710,6 @@ typedef struct {
     unsigned short width;                             /*!< Width of LSC table. */
     unsigned short height;                            /*!< Height of LSC table. */
     bool lsc_update;                                  /*!< Indicates if LSC table has been modified and shall be updated in ISP. false - no change, true - new LSC. */
-    light_source_t light_source[CMC_NUM_LIGHTSOURCES];/*!< Weights per light source type used in calculation of the LSC tables. */
     float scene_difficulty;                           /*!< Weighted cumulative confidence within selected patches (normalized against num_patches). */
     unsigned short num_patches;                       /*!< Number of patches that were used to make decision. */
     float covered_area;                               /*!< Statistics area covered by selected patches (%). */

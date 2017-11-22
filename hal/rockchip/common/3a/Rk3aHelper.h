@@ -22,7 +22,6 @@
 #define AAA_RK3AHELPER_H_
 
 #include <rk_aiq.h>
-#include <ia_coordinate.h>
 
 NAMESPACE_DECLARATION {
 

@@ -200,8 +200,6 @@ private:  /* Members */
     static const int16_t MAX_SETTINGS_HISTORY_SIZE = 10;
     std::vector<std::shared_ptr<CaptureUnitSettings>>    mSettingsHistory;
 
-    int mBaseIso;
-
     /*
      * Provider of details of the stream configuration
      */

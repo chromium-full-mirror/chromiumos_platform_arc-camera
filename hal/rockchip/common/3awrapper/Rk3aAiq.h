@@ -25,14 +25,10 @@ public:
     Rk3aAiq();
     virtual ~Rk3aAiq();
 
-    bool init(const ia_binary_data* aiqb_data,
-            const ia_binary_data* nvm_data,
-            const ia_binary_data* aiqd_data,
+    bool init(const ia_binary_data* nvm_data,
             unsigned int stats_max_width,
             unsigned int stats_max_height,
-            unsigned int max_num_stats_in,
-            uintptr_t cmc_handle,
-            uintptr_t mkn_handle);
+            unsigned int max_num_stats_in);
     void deinit();
     ia_err aeRun(const rk_aiq_ae_input_params* ae_input_params,
                   rk_aiq_ae_results** ae_results);

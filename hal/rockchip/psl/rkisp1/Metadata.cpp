@@ -34,8 +34,7 @@ Metadata::Metadata(int cameraId, Rk3aPlus *a3aWrapper):
         mRGammaLut(nullptr),
         mGGammaLut(nullptr),
         mBGammaLut(nullptr),
-        mCameraId(cameraId),
-        m3aWrapper(a3aWrapper)
+        mCameraId(cameraId)
 {
     CLEAR(mSensorDescriptor);
 }
@@ -239,7 +238,6 @@ void Metadata::writeSensorMetadata(RequestCtrlState &reqState)
     const CameraMetadata *settings = reqState.request->getSettings();
     camera_metadata_ro_entry entry;
     int64_t exposureTime = 0;
-    int32_t sensitivity = 0;
     uint16_t pixels_per_line = 0;
     uint16_t lines_per_frame = 0;
     int64_t manualExpTime = 1;
@@ -299,27 +297,6 @@ void Metadata::writeSensorMetadata(RequestCtrlState &reqState)
         exposureTime = exposureTime * 1000; // to ns.
         reqState.ctrlUnitResult->update(ANDROID_SENSOR_EXPOSURE_TIME,
                                          &exposureTime, 1);
-
-        /*
-         * Android wants the sensitivity in iso arithmetic unit.
-         */
-        int16_t manualIso = 100;
-        if (reqState.aiqInputParams.aeInputParams.manual_iso != nullptr)
-            manualIso = reqState.aiqInputParams.aeInputParams.manual_iso[0];
-
-        int32_t inputSensitivity = m3aWrapper->mapRealIso2UiIso(manualIso);
-        sensitivity = m3aWrapper->mapRealIso2UiIso(AeExpResult[0].exposure->iso);
-
-        if (sensitivity == 0) {
-            LOGW("Sensor sensitivity result is Zero, copy metadata input value");
-            sensitivity = inputSensitivity;
-        } else if (inputSensitivity > 0 && abs(inputSensitivity - sensitivity) <= DELTA_ISO) {
-            // due to rounding issue, aec can give a slight difference than manual request
-            sensitivity = inputSensitivity;
-        }
-
-        reqState.ctrlUnitResult->update(ANDROID_SENSOR_SENSITIVITY,
-                                             &sensitivity, 1);
     }
 
     int32_t value = ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;

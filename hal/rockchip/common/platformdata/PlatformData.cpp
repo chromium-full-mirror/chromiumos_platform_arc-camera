@@ -36,6 +36,7 @@
 #include <linux/kdev_t.h>  // MAJOR(), MINOR()
 #include <string>
 #include <sstream>
+#include <sys/stat.h>
 #include <fstream>
 
 // TODO this should come from the crl header file
@@ -58,11 +59,6 @@ using std::string;
 
 CameraProfiles* PlatformData::mInstance = nullptr;
 CameraHWInfo* PlatformData::mCameraHWInfo = nullptr;
-
-/**
- * index to this array is the camera id
- */
-CpfStore* PlatformData::sKnownCPFConfigurations[MAX_CPF_CACHED];
 
 GcssKeyMap* PlatformData::mGcssKeyMap = nullptr;
 
@@ -134,18 +130,11 @@ ia_uid GcssKeyMap::str2key(const std::string &key_str)
 /**
  * This method is only called once when the HAL library is loaded
  *
- * At this time we can load the XML config (camera3_prfiles.xml)and find the
- * CPF files for all the sensors. Once we load the CPF file
- * we fill the parts of the static metadata that is stored in the CMC
- *
- * Please note that the CpfStore objects are created once but not released
- * This is because this array is only freed if the process is destroyed.
+ * At this time we can load the XML config (camera3_prfiles.xml).
  */
 void PlatformData::init()
 {
     LOGD("Camera HAL static init");
-
-    CLEAR(sKnownCPFConfigurations);
 
     if (mGcssKeyMap) {
         delete mGcssKeyMap;
@@ -186,33 +175,12 @@ void PlatformData::init()
      * TODO: add a common field in the XML that lists the camera's OR
      * query from driver at runtime
      */
-    CpfStore *cpf;
     for (int i = 0; i < numberOfCameras; i++) {
         const CameraCapInfo *cci = PlatformData::getCameraCapInfo(i);
         if (cci == nullptr)
             continue;
         if (cci->sensorType() != SENSOR_TYPE_RAW)
             continue;
-
-        int xmlIndex = PlatformData::getXmlCameraId(i);
-        // Cpf is using id from XML because aiqb files are named using that id.
-        cpf = new CpfStore(xmlIndex, mCameraHWInfo);
-        /*
-         * As we should not change static metadata on fly, one assumption
-         * is that tuning team must make sure that the CMCs keep the same
-         * between CPFs of the same sensor.
-         * So here fillStaticMetadataFromCMC() is called just once for
-         * filling the static metadata. So Please note that only for item 0,
-         * AiqConf::mMetadata is initialized.
-         */
-        for (auto &aiqConfig : cpf->mAiqConfig)
-            aiqConfig.second->initCMC();
-
-        auto it = cpf->mAiqConfig.begin();
-        if (it != cpf->mAiqConfig.end())
-            it->second->fillStaticMetadataFromCMC(mInstance->mStaticMeta[i]);
-
-        sKnownCPFConfigurations[i] = cpf;
 
         initAiqdInfo(i);
     }
@@ -228,9 +196,6 @@ void PlatformData::deinit() {
         saveAiqdDataToFile();
         for (int i = 0; i < numberOfCameras(); i++) {
             mCameraHWInfo->mAiqdDataInfo[i].mData.reset();
-
-            delete sKnownCPFConfigurations[i];
-            sKnownCPFConfigurations[i] = nullptr;
         }
         delete mCameraHWInfo;
         mCameraHWInfo = nullptr;
@@ -308,23 +273,6 @@ void PlatformData::getCameraInfo(int cameraId, struct camera_info * info)
     info->orientation = orientation(cameraId);
     info->device_version = getCameraDeviceAPIVersion();
     info->static_camera_characteristics = getStaticMetadata(cameraId);
-}
-
-bool PlatformData::isCpfModeAvailable(int cameraId, string mode)
-{
-    auto it = sKnownCPFConfigurations[cameraId]->mAiqConfig.find(mode);
-    return it != sKnownCPFConfigurations[cameraId]->mAiqConfig.end();
-}
-
-const AiqConf* PlatformData::getAiqConfiguration(int cameraId, string mode)
-{
-    auto it = sKnownCPFConfigurations[cameraId]->mAiqConfig.find(mode);
-    if (it == sKnownCPFConfigurations[cameraId]->mAiqConfig.end()) {
-       LOGE("mode %s does not map to any AiqConfig!- using default one", mode.c_str());
-       return sKnownCPFConfigurations[cameraId]->mAiqConfig.begin()->second;
-    }
-    LOG1("%s: mode %s, Get AIQ configure", __FUNCTION__, mode.c_str());
-    return it->second;
 }
 
 /**
@@ -435,8 +383,8 @@ const CameraCapInfo * PlatformData::getCameraCapInfo(int cameraId)
  * vendor_id + platform_family_id + produc_line_id. This is always the first
  * for backwards compatibility reasons.
  *
- *  This list can be used to find the correct configuration file, either CPF or
- *  camera XML (camera3_profiles)
+ *  This list can be used to find the correct configuration file: camera XML
+ *  (camera3_profiles)
  *
  *  Please Note:
  *  If in non-spid platforms the identifiers in the system properties are not
@@ -815,40 +763,6 @@ float PlatformData::getStepEv(int cameraId)
     }
     return stepEV;
 
-}
-
-/**
- * static convenience getter for cpf and cmc data.
- */
-status_t PlatformData::getCpfAndCmc(ia_binary_data& cpfData,
-                                    ia_cmc_t** cmcData,
-                                    uintptr_t* cmcHandle,
-                                    int cameraId,
-                                    string mode)
-{
-    const AiqConf* aiqConf = getAiqConfiguration(cameraId, mode);
-    if (CC_UNLIKELY(aiqConf == nullptr)) {
-        LOGE("CPF file was not initialized ");
-        return NO_INIT;
-    }
-    cpfData.data = aiqConf->ptr();
-    cpfData.size = aiqConf->size();
-
-    const Rk3aCmc* cmc = aiqConf->getCMC();
-    CheckError(cmc == nullptr, NO_INIT, "@%s, call getCMC() fails", __FUNCTION__);
-
-    if (cmcData) {
-        *cmcData = cmc->getCmc();
-        CheckError(*cmcData == nullptr, NO_INIT, "@%s, call getCmc() fails", __FUNCTION__);
-    }
-
-    if (cmcHandle) {
-        *cmcHandle = cmc->getCmcHandle();
-        CheckError(reinterpret_cast<ia_cmc_t*>(*cmcHandle) == nullptr,
-            NO_INIT, "@%s, call getCmcHandle() fails", __FUNCTION__);
-    }
-
-    return OK;
 }
 
 CameraHWInfo::CameraHWInfo() :

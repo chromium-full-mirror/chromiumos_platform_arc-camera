@@ -104,7 +104,6 @@ libhalcommon_include_HEADERS = \
     UtilityMacros.h \
     CameraWindow.h \
     platformdata/Metadata.h \
-    platformdata/CameraConf.h \
     platformdata/CameraMetadataHelper.h \
     platformdata/CameraProfiles.h \
     platformdata/PlatformData.h \

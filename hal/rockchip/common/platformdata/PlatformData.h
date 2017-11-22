@@ -23,7 +23,6 @@
 #include <string>
 #include <vector>
 #include "Camera3V4l2Format.h"
-#include "CameraConf.h"
 #include "CameraWindow.h"
 #include "GraphConfigManager.h"
 #include "Metadata.h"
@@ -306,7 +305,6 @@ private:
     static CameraProfiles *mInstance;
     static CameraProfiles *getInstance(void);
     static CameraHWInfo *mCameraHWInfo;
-    static CpfStore *sKnownCPFConfigurations[MAX_CPF_CACHED];
     static GcssKeyMap *mGcssKeyMap;
 
 public:
@@ -318,9 +316,6 @@ public:
     static const camera_metadata_t *getStaticMetadata(int cameraId);
     static camera_metadata_t *getDefaultMetadata(int cameraId, int requestType);
     static CameraHwType getCameraHwType(int cameraId);
-    static bool isCpfModeAvailable(int cameraId, std::string mode);
-    static const AiqConf *getAiqConfiguration(int cameraId,
-                                              std::string mode = std::string(CPF_MODE_DEFAULT));
     static const CameraCapInfo *getCameraCapInfo(int cameraId);
     static const CameraHWInfo *getCameraHWInfo() { return mCameraHWInfo; }
     static int getXmlCameraId(int cameraId);
@@ -336,11 +331,6 @@ public:
     static bool supportExtendedMakernote(void);
     static bool supportIPUAcceleration(void);
     static bool supportFullColorRange(void);
-    static status_t getCpfAndCmc(ia_binary_data& cpfData,
-                                 ia_cmc_t** cmcData,
-                                 uintptr_t* cmcHandle,
-                                 int cameraId,
-                                 std::string mode = std::string(CPF_MODE_DEFAULT));
     /**
      * get the number of CPU cores
      * \return the number of CPU cores

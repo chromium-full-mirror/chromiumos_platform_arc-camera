@@ -58,7 +58,6 @@ ControlUnit::ControlUnit(ImguUnit *thePU,
         mThreadRunning(false),
         mMessageQueue("CtrlUnitThread", static_cast<int>(MESSAGE_ID_MAX)),
         mMessageThread(nullptr),
-        mBaseIso(100),
         mStreamCfgProv(aStreamCfgProv),
         mSettingsProcessor(nullptr),
         mMetadata(nullptr),
@@ -134,12 +133,6 @@ ControlUnit::init()
 
     mSettingsHistory.clear();
 
-    /* Set ISO map support */
-    bool supportIsoMap = false;
-    if (cap)
-        supportIsoMap = cap->getSupportIsoMap();
-    m3aWrapper->setSupportIsoMap(supportIsoMap);
-
     m3ARunner = new Rk3aRunner(mCameraId, m3aWrapper, mSettingsProcessor, lensController);
 
     /* Set digi gain support */
@@ -151,74 +144,6 @@ ControlUnit::init()
         LOGE("Error Initializing 3A Runner");
         return UNKNOWN_ERROR;
     }
-
-    status = allocateLscResults();
-    if (CC_UNLIKELY(status != OK)) {
-        LOGE("Failed to allocate LSC results");
-        return NO_MEMORY;
-    }
-
-    return status;
-}
-
-
-/**
- * allocateLscResults
- *
- * Allocates the size of the LSC tables used as part of the AIQ results
- * that the 3A algorithms produce.
- * This allocation is done dynamically since it depends on the sensor.
- *
- * Since cmc is read here, base_iso is stored in this function also.
- *
- * The memory will be freed by the AiqResult destructor.
- *
- */
-status_t ControlUnit::allocateLscResults()
-{
-    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    status_t status = OK;
-    std::shared_ptr<CaptureUnitSettings> capSettings = nullptr;
-    ia_binary_data cpfData;
-    ia_cmc_t *cmcData = nullptr;
-
-    PlatformData::getCpfAndCmc(cpfData, &cmcData, nullptr, mCameraId);
-    if (!cmcData) {
-        LOGE("No CMC data available for sensor. fix the CPF file!");
-        return UNKNOWN_ERROR;
-    }
-
-    if (cmcData && cmcData->cmc_sensitivity)
-        mBaseIso = cmcData->cmc_sensitivity->base_iso;
-    else
-        LOGW("Cannot get base iso from cmc");
-
-    if (!cmcData || !cmcData->cmc_parsed_lens_shading.cmc_lens_shading) {
-        LOGW("Lens shading grid not set in cmc");
-        return BAD_VALUE;
-    }
-
-    int tableH = cmcData->cmc_parsed_lens_shading.cmc_lens_shading->grid_height;
-    int tableW = cmcData->cmc_parsed_lens_shading.cmc_lens_shading->grid_width;
-    int tableSize = tableW * tableH;
-    if (tableSize == 0) {
-        LOGE("Invalid LSC table tize: fix the CPF file!");
-        return BAD_VALUE;
-    }
-
-    int poolSize = mCaptureUnitSettingsPool.availableItems();
-    for (int i = 0; i < poolSize; i++) {
-        mCaptureUnitSettingsPool.acquireItem(capSettings);
-        status = capSettings->aiqResults.allocateLsc(tableSize);
-        if (CC_UNLIKELY(status != OK)) {
-            break; // error reported outside
-        }
-        capSettings->aiqResults.init();
-        m3ARunner->initLsc(capSettings->aiqResults, tableSize);
-    }
-
-    if (status == OK)
-        status = m3ARunner->allocateLscTable(tableSize);
 
     return status;
 }

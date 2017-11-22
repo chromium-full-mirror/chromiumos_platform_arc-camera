@@ -352,23 +352,6 @@ SettingsProcessor::processAfSettings(const CameraMetadata  &settings,
         reqAiqCfg.captureSettings->afRegion = reqAiqCfg.aiqInputParams.afRegion;
 
         reqAiqCfg.captureSettings->afRegion.clip(reqAiqCfg.captureSettings->cropRegion);
-
-        /**
-         * Convert to IA coordinates before passing it to AF algo
-         */
-        const CameraWindow &fromW = reqAiqCfg.captureSettings->afRegion;
-        CameraWindow toW;
-        m3aWrapper->convertFromAndroidToIaCoordinates(fromW, toW);
-        /**
-         * setting the metering mode to touch focus
-         */
-        reqAiqCfg.aiqInputParams.afParams.focus_metering_mode = rk_aiq_af_metering_mode_touch;
-
-        reqAiqCfg.aiqInputParams.afParams.focus_rect->top = toW.top();
-        reqAiqCfg.aiqInputParams.afParams.focus_rect->left = toW.left();
-        reqAiqCfg.aiqInputParams.afParams.focus_rect->bottom = toW.bottom();
-        reqAiqCfg.aiqInputParams.afParams.focus_rect->right = toW.right();
-
     } else {
         CLEAR(reqAiqCfg.captureSettings->afRegion);
         // This is the normal case when there is no AF region defined.
