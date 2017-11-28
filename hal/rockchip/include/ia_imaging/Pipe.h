@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "ia_aiq_types.h"
+#include "rk_aiq_types.h"
 #include "stats_3a_public.h"
 #include "rgbpp_public.h"
 #include "ia_cp_types.h"
@@ -74,9 +74,9 @@ public:
 
 	virtual pipe_ver GetPipeVer() = 0;
 
-    virtual const ia_aiq_rgbs_grid* GetAWBStats() = 0;
-    virtual const ia_aiq_af_grid* GetAFStats() = 0;
-    virtual const ia_aiq_histogram* GetAEStats() = 0;
+    virtual const rk_aiq_rgbs_grid* GetAWBStats() = 0;
+    virtual const rk_aiq_af_grid* GetAFStats() = 0;
+    virtual const rk_aiq_histogram* GetAEStats() = 0;
 
 };
 

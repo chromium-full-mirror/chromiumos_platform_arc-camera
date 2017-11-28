@@ -25,7 +25,7 @@
 
 /*!
  * \file ia_dvs.h
- * \brief Definitions and declarations of Intel DVS library.
+ * \brief Definitions and declarations of Rockchip DVS library.
  */
 
 #ifndef _IA_DVS_H_
@@ -33,9 +33,9 @@
 
 #include <stdint.h>
 #include "ia_dvs_types.h"
-#include "ia_aiq_types.h"
+#include "rk_aiq_types.h"
 #include "ia_cmc_types.h"
-#include "ia_aiq.h"
+#include "rk_aiq.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -101,9 +101,9 @@ ia_dvs_deinit(ia_dvs_state *dvs_state);
 LIBEXPORT ia_err
 ia_dvs_set_statistics(ia_dvs_state *dvs_state,
                       const ia_dvs_statistics *statistics,
-                      const ia_aiq_ae_results *ae_results,
-                      const ia_aiq_af_results *af_results,
-                      const ia_aiq_sensor_events *sensor_events,
+                      const rk_aiq_ae_results *ae_results,
+                      const rk_aiq_af_results *af_results,
+                      const rk_aiq_sensor_events *sensor_events,
                       const unsigned long long frame_exposure_start,
                       const unsigned long long frame_readout_end);
 

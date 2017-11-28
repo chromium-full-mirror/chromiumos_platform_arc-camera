@@ -120,7 +120,7 @@ int v4L2Fmt2GFXFmt(int v4l2Fmt)
         gfxFmt = HAL_PIXEL_FORMAT_YCrCb_420_SP;
         break;
     case V4L2_PIX_FMT_NV12:
-        gfxFmt = HAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_INTEL;
+        gfxFmt = HAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK;
         break;
     case V4L2_PIX_FMT_YUYV:
         gfxFmt = HAL_PIXEL_FORMAT_YCbCr_422_I;

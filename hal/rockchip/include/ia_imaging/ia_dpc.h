@@ -26,7 +26,7 @@
 #ifndef _IA_DPC_H_
 #define _IA_DPC_H_
 
-#include "ia_aiq_types.h"
+#include "rk_aiq_types.h"
 #include "ia_types.h"
 #include "ia_mkn_types.h"
 #include "ia_cmc_types.h"
@@ -108,12 +108,12 @@ ia_dpc_deinit(ia_dpc *ia_dpc);
 LIBEXPORT ia_err
 ia_dpc_run(ia_dpc *ia_dpc,
           const sd_dpc_input *stripe_ptr,
-          const ia_aiq_frame_params *aiq_frame_params_ptr,
-          const ia_aiq_ae_exposure_result *ae_exposure_result_ptr,
+          const rk_aiq_frame_params *aiq_frame_params_ptr,
+          const rk_aiq_ae_exposure_result *ae_exposure_result_ptr,
           sd_dpc_output *dpc_output);
 
 /*!
- * \param[in]  ia_aiq               Mandatory.\n
+ * \param[in]  rk_aiq               Mandatory.\n
  *                                  DPC instance handle.
  * \param[out] out_ia_dpcd_data     Mandatory.\n
  *                                  Contains various DPC related information, collected during run-time and subject to

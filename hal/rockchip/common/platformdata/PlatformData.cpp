@@ -24,7 +24,7 @@
 #include "UtilityMacros.h"
 #include "ChromeCameraProfiles.h"
 #ifdef REMOTE_3A_SERVER
-#include "ipc/client/Intel3AClient.h"
+#include "ipc/client/Rockchip3AClient.h"
 #endif
 
 #include <unistd.h>        // usleep()
@@ -246,7 +246,7 @@ void PlatformData::deinit() {
     }
 
 #ifdef REMOTE_3A_SERVER
-    Intel3AClient::release();
+    Rockchip3AClient::release();
 #endif
 }
 
@@ -833,7 +833,7 @@ status_t PlatformData::getCpfAndCmc(ia_binary_data& cpfData,
     cpfData.data = aiqConf->ptr();
     cpfData.size = aiqConf->size();
 
-    const Intel3aCmc* cmc = aiqConf->getCMC();
+    const Rk3aCmc* cmc = aiqConf->getCMC();
     CheckError(cmc == nullptr, NO_INIT, "@%s, call getCMC() fails", __FUNCTION__);
 
     if (cmcData) {

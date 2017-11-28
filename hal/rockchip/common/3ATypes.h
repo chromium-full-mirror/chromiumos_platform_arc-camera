@@ -18,7 +18,7 @@
 #define _HAL_3A_TYPES_H_
 
 #include <ia_mkn_types.h>
-#include <ia_aiq_types.h>
+#include <rk_aiq_types.h>
 
 #define EV_LOWER_BOUND         (-100)
 #define EV_UPPER_BOUND          100

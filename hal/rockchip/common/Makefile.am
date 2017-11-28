@@ -40,12 +40,12 @@ HAL_COMMON_SRC = \
     mediacontroller/MediaController.cpp \
     imageProcess/ColorConverter.cpp \
     imageProcess/ImageScalerCore.cpp \
-    3a/IntelAFStateMachine.cpp \
-    3a/IntelAEStateMachine.cpp \
-    3a/IntelAWBStateMachine.cpp \
-    3a/Intel3aPlus.cpp \
-    3a/Intel3aCore.cpp \
-    3a/Intel3aHelper.cpp \
+    3a/RkAFStateMachine.cpp \
+    3a/RkAEStateMachine.cpp \
+    3a/RkAWBStateMachine.cpp \
+    3a/Rk3aPlus.cpp \
+    3a/Rk3aCore.cpp \
+    3a/Rk3aHelper.cpp \
     copied_utils/camera/CameraMetadata.cpp \
     copied_utils/system/camera_metadata.cpp \
     platformdata/gc/GraphConfigManager.cpp \
@@ -121,13 +121,13 @@ libhalcommon_include_HEADERS = \
     mediacontroller/MediaController.h \
     imageProcess/ColorConverter.h \
     imageProcess/ImageScalerCore.h \
-    3a/Intel3aControls.h \
-    3a/IntelAFStateMachine.h \
-    3a/IntelAEStateMachine.h \
-    3a/IntelAWBStateMachine.h \
-    3a/Intel3aPlus.h \
-    3a/Intel3aCore.h \
-    3a/Intel3aHelper.h \
+    3a/Rk3aControls.h \
+    3a/RkAFStateMachine.h \
+    3a/RkAEStateMachine.h \
+    3a/RkAWBStateMachine.h \
+    3a/Rk3aPlus.h \
+    3a/Rk3aCore.h \
+    3a/Rk3aHelper.h \
     CommonUtilMacros.h
 
 pkgconfiglibdir = $(libdir)/pkgconfig

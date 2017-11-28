@@ -17,7 +17,7 @@
 #ifndef _IA_CP_TYPES_H_
 #define _IA_CP_TYPES_H_
 
-#include "ia_aiq_types.h"
+#include "rk_aiq_types.h"
 #include "rgbpp_public.h"
 
 /** @file ia_cp_types.h
@@ -104,8 +104,8 @@ typedef struct
 
 typedef struct
 {
-    ia_aiq_ae_results   *ae_results;      /* Exposure times, analog and digital gain, lux level,... */
-    ia_aiq_gbce_results *gbce_results;    /* Long gamma LUTs applied on each RGB channel */
+    rk_aiq_ae_results   *ae_results;      /* Exposure times, analog and digital gain, lux level,... */
+    rk_aiq_gbce_results *gbce_results;    /* Long gamma LUTs applied on each RGB channel */
 } ia_cp_vhdr_cfg;
 
 typedef struct gtm_coeff {
@@ -148,7 +148,7 @@ typedef struct
  */
 typedef struct
 {
-    ia_aiq_exposure_parameters exposure;        /**< Generic exposure parameters for the input captures */
+    rk_aiq_exposure_parameters exposure;        /**< Generic exposure parameters for the input captures */
     int * imreg_fallback;                       /**< List of frames to ignore when using external alignment estimation (NULL for internal) */
     unsigned int zoom_factor;                   /**< Zoom factor */
 } ia_cp_ull_cfg;
@@ -193,7 +193,7 @@ typedef struct
  */
 typedef enum
 {
-    ia_cp_tgt_ia,        /**< Intel Architecture (IA) host */
+    ia_cp_tgt_ia,        /**< Rockchip Architecture (IA) host */
     ia_cp_tgt_ipu,       /**< Image Processing Unit */
     ia_cp_tgt_gpu,       /**< Graphics Processing Unit */
     ia_cp_tgt_ate,       /**< ATE C bitexact reference model */

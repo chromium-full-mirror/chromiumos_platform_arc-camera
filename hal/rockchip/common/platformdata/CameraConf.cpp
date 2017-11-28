@@ -33,8 +33,8 @@
 #include <sstream>
 #include "ia_exc.h"
 #include "CameraMetadataHelper.h"
-#include "Intel3aPlus.h"
-#include "Intel3aExc.h"
+#include "Rk3aPlus.h"
+#include "Rk3aExc.h"
 
 NAMESPACE_DECLARATION {
 using std::string;
@@ -46,7 +46,7 @@ static const int FORWARD_MATRIX_PRECISION = 65536;
 /**
  * Location of CPF files (actually they are .aiqb)
  */
-const char *cpfConfigPath = "/etc/camera/ipu3/";
+const char *cpfConfigPath = "/etc/camera/rkisp1/";
 
 // FIXME: The spec for following is "dr%02d[0-9][0-9]??????????????.aiqb"
 const char *cpfConfigPatternSuffix = "*.aiqb";  // How CPF file name should look
@@ -216,7 +216,7 @@ status_t AiqConf::fillLensStaticMetadata(camera_metadata_t * metadata)
         res |= MetadataHelper::updateMetadata(metadata, ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE, &min_focus_distance, 1);
         LOG2("static ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE :%.2f", min_focus_distance);
 
-        float hyperfocal_distance_diopter = 1000 / Intel3aPlus::calculateHyperfocalDistance(*cmc);
+        float hyperfocal_distance_diopter = 1000 / Rk3aPlus::calculateHyperfocalDistance(*cmc);
         res |= MetadataHelper::updateMetadata(metadata, ANDROID_LENS_INFO_HYPERFOCAL_DISTANCE, &hyperfocal_distance_diopter, 1);
         LOG2("static ANDROID_LENS_INFO_HYPERFOCAL_DISTANCE :%.2f", hyperfocal_distance_diopter);
         // TODO: lens.info.availableOpticalStabilization
@@ -399,7 +399,7 @@ status_t AiqConf::fillSensorStaticMetadata(camera_metadata_t * metadata)
 
     // maxAnalogSensitivity
     if (cmc->cmc_parsed_analog_gain_conversion.cmc_analog_gain_conversion != nullptr) {
-        Intel3aExc exc;
+        Rk3aExc exc;
         int32_t max_analog_sensitivity = 0;
         float max_analog_gain = 0.0;
         unsigned short analog_gain_code = 0;

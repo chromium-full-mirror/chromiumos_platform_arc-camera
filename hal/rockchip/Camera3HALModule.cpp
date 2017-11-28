@@ -90,9 +90,9 @@ static int hal_get_number_of_cameras(void)
 #ifdef REMOTE_3A_SERVER
     // if the hal fails to connect the remote 3a,
     // return camera number 0 makes camera service to reload hal.
-    Intel3AClient* client = Intel3AClient::getInstance();
+    Rockchip3AClient* client = Rockchip3AClient::getInstance();
     if (client == nullptr) {
-        LOGE("@%s, Intel3AClient::getInstance() fails", __FUNCTION__);
+        LOGE("@%s, Rockchip3AClient::getInstance() fails", __FUNCTION__);
         return 0;
     }
 #endif
@@ -206,8 +206,8 @@ camera_module_t VISIBILITY_PUBLIC HAL_MODULE_INFO_SYM = {
         NAMED_FIELD_INITIALIZER(module_api_version) CAMERA_MODULE_API_VERSION_2_3,
         NAMED_FIELD_INITIALIZER(hal_api_version) 0,
         NAMED_FIELD_INITIALIZER(id) CAMERA_HARDWARE_MODULE_ID,
-        NAMED_FIELD_INITIALIZER(name) "Intel Camera3HAL Module",
-        NAMED_FIELD_INITIALIZER(author) "Intel",
+        NAMED_FIELD_INITIALIZER(name) "Rockchip Camera3HAL Module",
+        NAMED_FIELD_INITIALIZER(author) "Rockchip",
         NAMED_FIELD_INITIALIZER(methods) &hal_module_methods,
         NAMED_FIELD_INITIALIZER(dso) nullptr,
         NAMED_FIELD_INITIALIZER(reserved) {0},

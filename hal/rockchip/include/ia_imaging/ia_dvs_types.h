@@ -15,7 +15,7 @@
  */
 /*!
  * \file ia_dvs_types.h
- * \brief Data types and enumerations for Intel DVS library.
+ * \brief Data types and enumerations for Rockchip DVS library.
  */
 #ifndef _IA_DVS_TYPES_H_
 #define _IA_DVS_TYPES_H_

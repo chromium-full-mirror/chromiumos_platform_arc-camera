@@ -18,26 +18,26 @@ ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = \
     libcamerahal.la
 
-3ASRC = common/3a/Intel3aPlus.cpp \
-        common/3a/Intel3aCore.cpp \
-        common/3a/Intel3aHelper.cpp \
-        common/3a/IntelAEStateMachine.cpp \
-        common/3a/IntelAFStateMachine.cpp \
-        common/3a/IntelAWBStateMachine.cpp
+3ASRC = common/3a/Rk3aPlus.cpp \
+        common/3a/Rk3aCore.cpp \
+        common/3a/Rk3aHelper.cpp \
+        common/3a/RkAEStateMachine.cpp \
+        common/3a/RkAFStateMachine.cpp \
+        common/3a/RkAWBStateMachine.cpp
 
 if REMOTE_3A_SERVER
-3ASRC += psl/ipu3/ipc/client/Intel3aCommon.cpp \
-         psl/ipu3/ipc/client/Intel3aCoordinate.cpp \
-         psl/ipu3/ipc/client/Intel3aAiq.cpp \
-         psl/ipu3/ipc/client/Intel3aCmc.cpp \
-         psl/ipu3/ipc/client/Intel3aExc.cpp \
-         psl/ipu3/ipc/client/Intel3aMkn.cpp
+3ASRC += psl/rkisp1/ipc/client/Rk3aCommon.cpp \
+         psl/rkisp1/ipc/client/Rk3aCoordinate.cpp \
+         psl/rkisp1/ipc/client/Rk3aAiq.cpp \
+         psl/rkisp1/ipc/client/Rk3aCmc.cpp \
+         psl/rkisp1/ipc/client/Rk3aExc.cpp \
+         psl/rkisp1/ipc/client/Rk3aMkn.cpp
 else
-3ASRC += common/3awrapper/Intel3aCoordinate.cpp \
-         common/3awrapper/Intel3aAiq.cpp \
-         common/3awrapper/Intel3aCmc.cpp \
-         common/3awrapper/Intel3aExc.cpp \
-         common/3awrapper/Intel3aMkn.cpp
+3ASRC += common/3awrapper/Rk3aCoordinate.cpp \
+         common/3awrapper/Rk3aAiq.cpp \
+         common/3awrapper/Rk3aCmc.cpp \
+         common/3awrapper/Rk3aExc.cpp \
+         common/3awrapper/Rk3aMkn.cpp
 endif
 
 AALSRC = AAL/Camera3HAL.cpp \
@@ -138,8 +138,8 @@ libcamerahal_la_CPPFLAGS += $(ARC_CAMERA3_ANDROID_HEADERS_CFLAGS) \
                             $(LIBYUV_CFLAGS)
 
 #includes
-KERNELHEADERS = -I$(top_srcdir)/LAL/ipu3/include/uapi \
-                -I$(top_srcdir)/LAL/ipu3/include
+KERNELHEADERS = -I$(top_srcdir)/LAL/rkisp1/include/uapi \
+                -I$(top_srcdir)/LAL/rkisp1/include
 ALLINCLUDES = \
     $(PSLCPPFLAGS) \
     $(KERNELHEADERS) \
@@ -156,7 +156,7 @@ ALLINCLUDES = \
     -I$(top_srcdir)/common/gcss
 
 if REMOTE_3A_SERVER
-ALLINCLUDES += -I$(top_srcdir)/psl/ipu3/ipc/client
+ALLINCLUDES += -I$(top_srcdir)/psl/rkisp1/ipc/client
 else
 ALLINCLUDES += -I$(top_srcdir)/common/3awrapper
 endif
@@ -176,4 +176,4 @@ libcamerahal_la_LIBADD = $(EXTERNAL_LIBS) $(UTIL_LIBS) $(STATIC_LIBS) $(OTHER_LI
 
 libcamerahal_la_LDFLAGS = -Wl,-z,defs
 
-include psl/ipu3/Makefile.am.inc
+include psl/rkisp1/Makefile.am.inc
