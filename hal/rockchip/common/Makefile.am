@@ -72,9 +72,6 @@ libhalcommon_la_CPPFLAGS += -DNAMESPACE_DECLARATION_END=//icamera
 libhalcommon_la_CPPFLAGS += -DUSING_DECLARED_NAMESPACE=using\ namespace\ icamera
 
 libhalcommon_la_CPPFLAGS += $(ALL_INCLUDES)
-libhalcommon_la_CPPFLAGS += $(IA_IMAGING_CFLAGS)
-libhalcommon_la_CPPFLAGS += $(LIBIACSS_CFLAGS)
-libhalcommon_la_CPPFLAGS += $(LIBCAMERANVM_CFLAGS)
 
 libhalcommon_includedir = $(includedir)
 libhalcommon_utils_includedir = $(includedir)/utils

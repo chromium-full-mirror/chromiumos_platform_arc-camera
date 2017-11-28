@@ -93,13 +93,7 @@ endif
 if !REMOTE_3A_SERVER
 # libmfldadvci shared libraries
 libcamerahal_la_LDFLAGS += \
-    -lia_cmc_parser \
-    -lrk_aiq \
-    -lia_exc \
-    -lia_log \
-    -lia_mkn \
-    -lia_coordinate \
-    -lSkyCamAICKBL
+    -lrk_aiq
 endif
 
 if REMOTE_3A_SERVER
@@ -133,7 +127,6 @@ libcam_algo_la_CPPFLAGS = \
     -I$(ROOT)/usr/include/android/system/core/include \
     -I$(ROOT)/usr/include/base-$(BASE_VER) \
     $(LIBUTILS_CFLAGS) \
-    $(IA_IMAGING_CFLAGS) \
     -D__USE_ANDROID_METADATA__ \
     -DMACRO_KBL_AIC \
     -DCAMERA_HAL_DEBUG \
@@ -144,14 +137,8 @@ libcam_algo_la_CPPFLAGS += -DNAMESPACE_DECLARATION_END=}
 libcam_algo_la_CPPFLAGS += -DUSING_DECLARED_NAMESPACE=using\ namespace\ android::camera2
 
 libcam_algo_la_LDFLAGS = \
-    -lSkyCamAICKBL \
     -lStatsConverter \
-    -lia_cmc_parser \
     -lrk_aiq \
-    -lia_exc \
-    -lia_mkn \
-    -lia_log \
-    -lia_coordinate \
     $(LIBUTILS_LIBS)
 
 libcam_algo_la_LDFLAGS += -lbase-$(BASE_VER)
