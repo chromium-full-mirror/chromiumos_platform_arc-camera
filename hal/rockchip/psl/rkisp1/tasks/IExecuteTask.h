@@ -1,5 +1,9 @@
 
 /*
+ * Copyright (c) 2017, Fuzhou Rockchip Electronics Co., Ltd
+ *
+ * Based on Intel IPU3 HAL by Intel Corporation.
+ *
  * Copyright (C) 2014-2017 Intel Corporation.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
