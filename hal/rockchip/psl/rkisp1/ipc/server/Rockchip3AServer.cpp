@@ -26,9 +26,6 @@
 
 #include "Rockchip3AServer.h"
 #include "LogHelper.h"
-#include "RuntimeParamsHelper.h"
-
-#include <ia_log.h>
 
 namespace rockchip {
 namespace camera {
@@ -53,8 +50,7 @@ void Rockchip3AServer::deInit()
 
 Rockchip3AServer::Rockchip3AServer():
     mThread("Rockchip3AServer Thread"),
-    mCallback(nullptr),
-    mIaLogInitialized(false)
+    mCallback(nullptr)
 {
     LOG1("@%s", __FUNCTION__);
 
@@ -65,9 +61,6 @@ Rockchip3AServer::Rockchip3AServer():
 Rockchip3AServer::~Rockchip3AServer()
 {
     LOG1("@%s", __FUNCTION__);
-
-    if (mIaLogInitialized)
-        ia_log_deinit();
 }
 
 int32_t Rockchip3AServer::initialize(const camera_algorithm_callback_ops_t* callback_ops)
@@ -77,18 +70,6 @@ int32_t Rockchip3AServer::initialize(const camera_algorithm_callback_ops_t* call
     CheckError((!callback_ops), -EINVAL, "@%s, the callback_ops is nullptr", __FUNCTION__);
 
     mCallback = callback_ops;
-
-    // ia log redirection
-    if (mIaLogInitialized == false) {
-        ia_env env = {
-            &LogHelper::cca_print_debug,
-            &LogHelper::cca_print_error,
-            &LogHelper::cca_print_info
-        };
-        ia_err ret = ia_log_init(&env);
-        CheckError(ret != ia_err_none, -ENOMEM, "@%s, ia_log_init fails, ret:%d", __FUNCTION__, ret);
-        mIaLogInitialized = true;
-    }
 
     return 0;
 }
@@ -137,39 +118,10 @@ uint32_t Rockchip3AServer::handleRequest(uint8_t cmd, int reqeustSize, void* add
     LOG1("@%s, cmd:%d:%s, reqeustSize:%d, addr:%p",
         __FUNCTION__, cmd, Rockchip3AIpcCmdToString((IPC_CMD)cmd), reqeustSize, addr);
 
-    if (cmd != IPC_3A_AIC_RESET && cmd != IPC_3A_CMC_DEINIT) {
-        CheckError((addr == nullptr), 1, "@%s, addr is nullptr", __FUNCTION__);
-    }
+    CheckError((addr == nullptr), 1, "@%s, addr is nullptr", __FUNCTION__);
 
     status_t status = OK;
     switch (cmd) {
-        case IPC_3A_AIC_INIT:
-            status = mAic.init(addr, reqeustSize);
-            break;
-        case IPC_3A_AIC_RUN:
-            mAic.run(addr, reqeustSize);
-            break;
-        case IPC_3A_AIC_RESET:
-            mAic.reset(addr, reqeustSize);
-            break;
-        case IPC_3A_AIC_GETAICVERSION:
-            status = mAic.getAicVersion(addr, reqeustSize);
-            break;
-        case IPC_3A_AIC_GETAICCONFIG:
-            status = mAic.getAicConfig(addr, reqeustSize);
-            break;
-        case IPC_3A_CMC_INIT:
-            status = mCmc.ia_cmc_init(addr, reqeustSize);
-            break;
-        case IPC_3A_CMC_DEINIT:
-            status = mCmc.ia_cmc_deinit(addr, reqeustSize);
-            break;
-        case IPC_3A_EXC_ANALOG_GAIN_TO_SENSOR:
-            status = mExc.analog_gain_to_sensor_units(addr, reqeustSize);
-            break;
-        case IPC_3A_EXC_SENSOR_TO_ANALOG_GAIN:
-            status = mExc.sensor_units_to_analog_gain(addr, reqeustSize);
-            break;
         case IPC_3A_AIQ_INIT:
             status = mAiq.aiq_init(addr, reqeustSize);
             break;
@@ -185,38 +137,14 @@ uint32_t Rockchip3AServer::handleRequest(uint8_t cmd, int reqeustSize, void* add
         case IPC_3A_AIQ_AWB_RUN:
             status = mAiq.aiq_awb_run(addr, reqeustSize);
             break;
-        case IPC_3A_AIQ_PA_RUN:
-            status = mAiq.aiq_pa_run(addr, reqeustSize);
-            break;
-        case IPC_3A_AIQ_SA_RUN:
-            status = mAiq.aiq_sa_run(addr, reqeustSize);
-            break;
-        case IPC_3A_AIQ_GBCE_RUN:
-            status = mAiq.aiq_gbce_run(addr, reqeustSize);
-            break;
-        case IPC_3A_AIQ_GET_AIQ_DATA:
-            status = mAiq.aiq_get_aiqd_data(addr, reqeustSize);
+        case IPC_3A_AIQ_MISC_ISP_RUN:
+            status = mAiq.aiq_misc_run(addr, reqeustSize);
             break;
         case IPC_3A_AIQ_STATISTICS_SET:
             status = mAiq.statistics_set(addr, reqeustSize);
             break;
         case IPC_3A_AIQ_GET_VERSION:
             status = mAiq.aiq_get_version(addr, reqeustSize);
-            break;
-        case IPC_3A_MKN_INIT:
-            status = mMkn.init(addr, reqeustSize);
-            break;
-        case IPC_3A_MKN_UNINIT:
-            status = mMkn.uninit(addr, reqeustSize);
-            break;
-        case IPC_3A_MKN_PREPARE:
-            status = mMkn.prepare(addr, reqeustSize);
-            break;
-        case IPC_3A_MKN_ENABLE:
-            status = mMkn.enable(addr, reqeustSize);
-            break;
-        case IPC_3A_COORDINATE_COVERT:
-            status = mCoordinate.convert(addr, reqeustSize);
             break;
         default:
             LOGE("@%s, cmd:%d is not defined", __FUNCTION__, cmd);

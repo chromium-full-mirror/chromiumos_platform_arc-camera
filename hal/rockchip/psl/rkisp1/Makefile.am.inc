@@ -64,14 +64,9 @@ PSLCPPFLAGS += \
     -I$(top_srcdir)/psl/rkisp1/ipc
 
 PSLSRC += \
-    psl/rkisp1/ipc/client/SkyCamMojoProxy.cpp \
     psl/rkisp1/ipc/client/Rockchip3AClient.cpp \
     psl/rkisp1/ipc/IPCCommon.cpp \
-    psl/rkisp1/ipc/IPCAic.cpp \
-    psl/rkisp1/ipc/IPCAiq.cpp \
-    psl/rkisp1/ipc/IPCCmc.cpp \
-    psl/rkisp1/ipc/IPCExc.cpp \
-    psl/rkisp1/ipc/IPCMkn.cpp
+    psl/rkisp1/ipc/IPCAiq.cpp
 
 libcamerahal_la_LDFLAGS += -lcab.pic
 libcamerahal_la_LDFLAGS += -lrt
@@ -91,19 +86,10 @@ if REMOTE_3A_SERVER
 lib_LTLIBRARIES += libcam_algo.la
 libcam_algo_la_SOURCES = \
     psl/rkisp1/ipc/server/Rockchip3AServer.cpp \
-    psl/rkisp1/ipc/server/AicLibrary.cpp \
-    psl/rkisp1/ipc/server/CmcLibrary.cpp \
     psl/rkisp1/ipc/server/AiqLibrary.cpp \
-    psl/rkisp1/ipc/server/MknLibrary.cpp \
-    psl/rkisp1/ipc/server/CoordinateLibrary.cpp \
-    psl/rkisp1/ipc/server/ExcLibrary.cpp \
     common/LogHelper.cpp \
     psl/rkisp1/ipc/IPCCommon.cpp \
-    psl/rkisp1/ipc/IPCAic.cpp \
-    psl/rkisp1/ipc/IPCAiq.cpp \
-    psl/rkisp1/ipc/IPCCmc.cpp \
-    psl/rkisp1/ipc/IPCExc.cpp \
-    psl/rkisp1/ipc/IPCMkn.cpp
+    psl/rkisp1/ipc/IPCAiq.cpp
 
 libcam_algo_la_CPPFLAGS = \
     $(STRICTED_CPPFLAGS) \
@@ -125,7 +111,6 @@ libcam_algo_la_CPPFLAGS += -DNAMESPACE_DECLARATION_END=}
 libcam_algo_la_CPPFLAGS += -DUSING_DECLARED_NAMESPACE=using\ namespace\ android::camera2
 
 libcam_algo_la_LDFLAGS = \
-    -lStatsConverter \
     -lrk_aiq \
     $(LIBUTILS_LIBS)
 

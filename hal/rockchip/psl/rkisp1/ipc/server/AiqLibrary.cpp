@@ -25,7 +25,6 @@
 #include "AiqLibrary.h"
 
 #include <rk_aiq.h>
-#include <ia_cmc_parser.h>
 
 #include "IPCCommon.h"
 #include "common/UtilityMacros.h"
@@ -51,20 +50,11 @@ status_t AiqLibrary::aiq_init(void* pData, int dataSize)
 
     aiq_init_params* params = static_cast<aiq_init_params*>(pData);
 
-    ia_binary_data aiqbData = {nullptr, 0};
-    ia_binary_data nvmData = {nullptr, 0};
-    ia_binary_data aiqdData = {nullptr, 0};
-    bool ret = mIpc.serverUnflattenInit(pData, dataSize, &aiqbData, &nvmData, &aiqdData);
+    const char* xmlFilePath;
+    bool ret = mIpc.serverUnflattenInit(*params, &xmlFilePath);
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenInit fails", __FUNCTION__);
 
-    rk_aiq * aiq = rk_aiq_init(&aiqbData,
-                                &nvmData,
-                                &aiqdData,
-                                params->stats_max_width,
-                                params->stats_max_height,
-                                params->max_num_stats_in,
-                                reinterpret_cast<ia_cmc_t*>(params->cmcRemoteHandle),
-                                reinterpret_cast<ia_mkn*>(params->ia_mkn));
+    rk_aiq * aiq = rk_aiq_init(xmlFilePath);
     CheckError((aiq == nullptr), UNKNOWN_ERROR, "@%s, rk_aiq_init failed", __FUNCTION__);
 
     params->results = reinterpret_cast<uintptr_t>(aiq);
@@ -96,30 +86,22 @@ status_t AiqLibrary::aiq_af_run(void* pData, int dataSize)
     bool ret = mIpc.serverUnflattenAf(*params, &afParams);
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflatten fails", __FUNCTION__);
 
-    rk_aiq_af_results* afResults = nullptr;
-    ia_err err = rk_aiq_af_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), afParams, &afResults);
+    status_t err = NO_ERROR;//TODO: rk_aiq_af_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), afParams, &params->results);
     CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_af_run failed %d", __FUNCTION__, err);
-
-    ret = mIpc.serverFlattenAf(*afResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlatten fails", __FUNCTION__);
 
     return OK;
 }
 
-status_t AiqLibrary::aiq_gbce_run(void* pData, int dataSize)
+status_t AiqLibrary::aiq_misc_run(void* pData, int dataSize)
 {
     LOG1("@%s, pData:%p, dataSize:%d", __FUNCTION__, pData, dataSize);
     CheckError((pData == nullptr), UNKNOWN_ERROR, "@%s, pData is nullptr", __FUNCTION__);
-    CheckError((dataSize < sizeof(gbce_run_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
+    CheckError((dataSize < sizeof(misc_isp_run_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
 
-    gbce_run_params *params = static_cast<gbce_run_params*>(pData);
+    misc_isp_run_params *params = static_cast<misc_isp_run_params*>(pData);
 
-    rk_aiq_gbce_results* gbceResults = nullptr;
-    ia_err err = rk_aiq_gbce_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), &params->base, &gbceResults);
+    status_t err = rk_aiq_misc_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), &params->base, &params->results);
     CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_gbce_run failed %d", __FUNCTION__, err);
-
-    bool ret = mIpc.serverFlattenGbce(*gbceResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlattenGbce fails", __FUNCTION__);
 
     return OK;
 }
@@ -131,12 +113,12 @@ status_t AiqLibrary::statistics_set(void* pData, int dataSize)
     CheckError((dataSize < sizeof(set_statistics_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
 
     set_statistics_params* params = static_cast<set_statistics_params*>(pData);
+    set_statistics_params_data* statParams = nullptr;
 
-    rk_aiq_statistics_input_params* stat = nullptr;
-    bool ret = mIpc.serverUnflattenStat(*params, &stat);
+    bool ret = mIpc.serverUnflattenStat(*params, &statParams);
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenStat fails", __FUNCTION__);
 
-    ia_err err = rk_aiq_statistics_set((rk_aiq*)params->rk_aiq, stat);
+    status_t err = rk_aiq_stats_set((rk_aiq*)params->aiq_handle, statParams->input, statParams->sensor_desc);
     CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_statistics_set failed %d", __FUNCTION__, err);
 
     return OK;
@@ -154,12 +136,8 @@ status_t AiqLibrary::aiq_ae_run(void* pData, int dataSize)
     bool ret = mIpc.serverUnflattenAe(*params, &aeParams);
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenAe fails", __FUNCTION__);
 
-    rk_aiq_ae_results *aeResults = nullptr;
-    ia_err err = rk_aiq_ae_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), aeParams, &aeResults);
+    status_t err = rk_aiq_ae_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), aeParams, &params->results);
     CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_ae_run failed %d", __FUNCTION__, err);
-
-    ret = mIpc.serverFlattenAe(*aeResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlattenAe fails", __FUNCTION__);
 
     return OK;
 }
@@ -176,76 +154,8 @@ status_t AiqLibrary::aiq_awb_run(void* pData, int dataSize)
     bool ret = mIpc.serverUnflattenAwb(*params, &awbParams);
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenAwb fails", __FUNCTION__);
 
-    rk_aiq_awb_results *awbResults = nullptr;
-    ia_err err = rk_aiq_awb_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), awbParams, &awbResults);
+    status_t err = rk_aiq_awb_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), awbParams, &params->results);
     CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_awb_run failed %d", __FUNCTION__, err);
-
-    ret = mIpc.serverFlattenAwb(*awbResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlattenAwb fails", __FUNCTION__);
-
-    return OK;
-}
-
-status_t AiqLibrary::aiq_pa_run(void* pData, int dataSize)
-{
-    LOG1("@%s, pData:%p, dataSize:%d", __FUNCTION__, pData, dataSize);
-    CheckError((pData == nullptr), UNKNOWN_ERROR, "@%s, pData is nullptr", __FUNCTION__);
-    CheckError((dataSize < sizeof(pa_run_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
-
-    pa_run_params* params = static_cast<pa_run_params*>(pData);
-
-    rk_aiq_pa_input_params* paParams = nullptr;
-    bool ret = mIpc.serverUnflattenPa(*params, &paParams);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenPa fails", __FUNCTION__);
-
-    rk_aiq_pa_results* paResults = nullptr;
-    ia_err err = rk_aiq_pa_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), paParams, &paResults);
-    CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_pa_run failed %d", __FUNCTION__, err);
-
-    ret = mIpc.serverFlattenPa(*paResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlattenPa fails", __FUNCTION__);
-
-    return OK;
-}
-
-status_t AiqLibrary::aiq_sa_run(void* pData, int dataSize)
-{
-    LOG1("@%s, pData:%p, dataSize:%d", __FUNCTION__, pData, dataSize);
-    CheckError((pData == nullptr), UNKNOWN_ERROR, "@%s, pData is nullptr", __FUNCTION__);
-    CheckError((dataSize < sizeof(sa_run_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
-
-    sa_run_params* params = static_cast<sa_run_params*>(pData);
-
-    rk_aiq_sa_input_params* saParams = nullptr;
-    bool ret = mIpc.serverUnflattenSa(*params, &saParams);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverUnflattenSa fails", __FUNCTION__);
-
-    rk_aiq_sa_results* saResults = nullptr;
-    ia_err err = rk_aiq_sa_run(reinterpret_cast<rk_aiq*>(params->aiq_handle), saParams, &saResults);
-    CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_sa_run failed %d", __FUNCTION__, err);
-
-    ret = mIpc.serverFlattenSa(*saResults, params);
-    CheckError(ret == false, UNKNOWN_ERROR, "@%s, serverFlattenSa fails", __FUNCTION__);
-
-    return OK;
-}
-
-status_t AiqLibrary::aiq_get_aiqd_data(void* pData, int dataSize)
-{
-    LOG1("@%s, pData:%p, dataSize:%d", __FUNCTION__, pData, dataSize);
-    CheckError((pData == nullptr), UNKNOWN_ERROR, "@%s, pData is nullptr", __FUNCTION__);
-    CheckError((dataSize < sizeof(ia_binary_data_params)), UNKNOWN_ERROR, "@%s, buffer is small", __FUNCTION__);
-
-    ia_binary_data binaryData = {nullptr, 0};
-
-    ia_binary_data_params* params = static_cast<ia_binary_data_params*>(pData);
-
-    ia_err err = rk_aiq_get_aiqd_data(reinterpret_cast<rk_aiq*>(params->aiq_handle), &binaryData);
-    CheckError((err != 0), UNKNOWN_ERROR, "@%s, rk_aiq_get_aiqd_data failed %d", __FUNCTION__, err);
-    LOG2("@%s, binary_data, data:%p, size:%d", __FUNCTION__, binaryData.data, binaryData.size);
-
-    MEMCPY_S(params->data, sizeof(params->data), binaryData.data, binaryData.size);
-    params->size = binaryData.size;
 
     return OK;
 }
@@ -258,7 +168,7 @@ status_t AiqLibrary::aiq_get_version(void* pData, int dataSize)
 
     rk_aiq_version_params* params = static_cast<rk_aiq_version_params*>(pData);
 
-    const char* version = rk_aiq_get_version();
+    const char* version = "";//TODO: rk_aiq_get_version();
     strncpy(params->data, version, sizeof(params->data));
     params->size = MIN(strlen(version), sizeof(params->data));
     LOG2("@%s, aiq version:%s, size:%d", __FUNCTION__, version, params->size);
