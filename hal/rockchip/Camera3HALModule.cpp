@@ -233,7 +233,7 @@ camera_module_t VISIBILITY_PUBLIC HAL_MODULE_INFO_SYM = {
 
 // PSL-specific constructor values to start from 200
 // to have enough reserved priorities to common HAL
-__attribute__((constructor(103))) void initCameraHAL() {
+__attribute__((constructor)) void initCameraHAL() {
     LogHelper::setDebugLevel();
     PerformanceTraces::reset();
     PlatformData::init();
@@ -244,6 +244,6 @@ __attribute__((constructor(103))) void initCameraHAL() {
     }
 }
 
-__attribute__((destructor(103))) void deinitCameraHAL() {
+__attribute__((destructor)) void deinitCameraHAL() {
     PlatformData::deinit();
 }
