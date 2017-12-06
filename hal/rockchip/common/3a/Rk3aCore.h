@@ -29,7 +29,6 @@
 #include "CameraWindow.h"
 #include "UtilityMacros.h"
 #include "Rk3aControls.h"
-#include "Rk3aHelper.h"
 
 #include "Rk3aAiq.h"
 

@@ -158,7 +158,6 @@ status_t Rk3aRunner::run2A(RequestCtrlState &reqState, bool forceUpdated)
 
         if (CC_LIKELY(status == OK)) {
             reqState.aeState = ALGORITHM_RUN;
-            Rk3aHelper::dumpAeResult(&reqState.captureSettings->aiqResults.aeResults);
         } else {
             LOGE("Run AE failed for request Id %d", reqId);
             return UNKNOWN_ERROR;
@@ -218,7 +217,6 @@ status_t Rk3aRunner::run2A(RequestCtrlState &reqState, bool forceUpdated)
     } else {
         reqState.captureSettings->aiqResults.awbResults = mLatestResults.awbResults;
     }
-    Rk3aHelper::dumpAwbResult(&reqState.captureSettings->aiqResults.awbResults);
     /*
      * Parameter Adaptor RUN
      */
@@ -383,9 +381,6 @@ void Rk3aRunner::runAf(RequestCtrlState &reqState, bool bypass)
         }
     }
 
-    // Uncomment for debugging
-    Rk3aHelper::dumpAfInputParams(&reqState.aiqInputParams.afParams);
-
     if (bypass) {
         *afResults = mLatestResults.afResults;
         status = OK;
@@ -395,8 +390,6 @@ void Rk3aRunner::runAf(RequestCtrlState &reqState, bool bypass)
 
     if (status == OK) {
         reqState.afState = ALGORITHM_RUN;
-        // Uncomment for debugging
-        Rk3aHelper::dumpAfResult(afResults);
         status = processAfResults(reqState);
     } else {
         LOGW("AF Failed, update default");

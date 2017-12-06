@@ -20,7 +20,6 @@ lib_LTLIBRARIES = \
 
 3ASRC = common/3a/Rk3aPlus.cpp \
         common/3a/Rk3aCore.cpp \
-        common/3a/Rk3aHelper.cpp \
         common/3a/RkAEStateMachine.cpp \
         common/3a/RkAFStateMachine.cpp \
         common/3a/RkAWBStateMachine.cpp
