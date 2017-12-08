@@ -130,7 +130,6 @@ private:
     CameraWindow    mAPA;   /*!< Active Pixel Array */
     StaticMetadataCache mStaticMetadataCache; /*!< metadata fetched at init */
     int mCameraId;
-    Rk3aPlus    *m3aWrapper; /* SettingsProcessor doesn't own m3aWrapper */
 
     /**
      * Sensor mode information
@@ -149,11 +148,6 @@ private:
      * Provider of details of the stream configuration
      */
     IStreamConfigProvider &mStreamCfgProv;
-
-    /**
-     * To be handled by the AF state machine
-     */
-    bool mFixedFocus;
 };
 
 } /* namespace camera2 */

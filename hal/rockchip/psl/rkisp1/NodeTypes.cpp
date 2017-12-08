@@ -43,6 +43,7 @@ int getDefaultMemoryType(NodeTypes node)
     case IMGU_NODE_STAT:
         return V4L2_MEMORY_MMAP;
     case IMGU_NODE_INPUT:
+    case IMGU_NODE_OUTPUT:
     case IMGU_NODE_VF_PREVIEW:
     case IMGU_NODE_PV_PREVIEW:
     case IMGU_NODE_STILL:

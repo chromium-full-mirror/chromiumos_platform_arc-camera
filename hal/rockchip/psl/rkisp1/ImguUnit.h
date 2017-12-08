@@ -130,8 +130,6 @@ private:
     std::map<NodeTypes, camera3_stream_t *> mStreamNodeMapping; /* mStreamNodeMapping doesn't own camera3_stream_t objects */
     std::map<camera3_stream_t*, NodeTypes> mStreamListenerMapping;
 
-    std::shared_ptr<SharedItemPool<rk_aiq_af_grid>> mAfFilterBuffPool; /* 3A statistics buffers */
-    std::shared_ptr<SharedItemPool<rk_aiq_rgbs_grid>> mRgbsGridBuffPool;
     static const int PUBLIC_STATS_POOL_SIZE = 9;
     static const int RKISP1_MAX_STATISTICS_WIDTH = 80;
     static const int RKISP1_MAX_STATISTICS_HEIGHT = 60;

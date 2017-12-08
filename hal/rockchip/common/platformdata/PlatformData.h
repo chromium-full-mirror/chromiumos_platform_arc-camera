@@ -160,8 +160,6 @@ enum ExtensionGroups {
   *
   * When the camera is starting, if there is aiqd data, rk_aiq_init() will
   * use it. The 3a also could work if there is no aiqd data.
-  * When the camera is stopping, before the rk_aiq_deinit() is called,
-  * the rk_aiq_get_aiqd_data() will get the aiqd data from 3a libs.
   *
   * The aiqd data will be read from file system to PlatformData
   * when the camera HAL is loaded by arc_camera3_service.
@@ -257,6 +255,7 @@ public:
     CameraCapInfo() : mSensorType(SENSOR_TYPE_NONE), mGCMNodes(nullptr) {};
     virtual ~CameraCapInfo() {};
     virtual int sensorType(void) const = 0;
+    virtual const std::string& getIqTuningFile(void) const = 0;
     const GraphConfigNodes* getGraphConfigNodes() const { return mGCMNodes; }
 
 protected:
@@ -336,11 +335,6 @@ public:
      * \return the number of CPU cores
      */
     static unsigned int getNumOfCPUCores();
-    /**
-    * Utility methods to retrieve particular fields from the static metadata
-    * (a.k.a. Camera Characteristics), Please do NOT add anything else here
-    * without a very good reason.
-    */
     static int facing(int cameraId);
     static int orientation(int cameraId);
     static float getStepEv(int cameraId);

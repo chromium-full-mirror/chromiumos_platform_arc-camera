@@ -275,34 +275,38 @@ RkAEModeAuto::processResult(const rk_aiq_ae_results &aeResults,
     case ANDROID_CONTROL_AE_STATE_SEARCHING:
     case ANDROID_CONTROL_AE_STATE_CONVERGED:
     case ANDROID_CONTROL_AE_STATE_FLASH_REQUIRED:
-        if (aeResults.exposures[0].converged == true) {
+        if (aeResults.converged) {
             mEvChanged = false; // converged -> reset
             if (mLastAeControls.aeLock) {
                 mCurrentAeState = ANDROID_CONTROL_AE_STATE_LOCKED;
             } else {
-                if (aeResults.flashes[0].status == rk_aiq_flash_status_torch ||
-                    aeResults.flashes[0].status == rk_aiq_flash_status_pre) {
-                    mCurrentAeState = ANDROID_CONTROL_AE_STATE_FLASH_REQUIRED;
-                } else {
-                    mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED;
-                }
+                /* TODO */
+                /* if (aeResults.flashes[0].status == rk_aiq_flash_status_torch || */
+                /*     aeResults.flashes[0].status == rk_aiq_flash_status_pre) { */
+                /*     mCurrentAeState = ANDROID_CONTROL_AE_STATE_FLASH_REQUIRED; */
+                /* } else { */
+                /*     mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED; */
+                /* } */
+                mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED;
             }
         } else {
             mCurrentAeState = ANDROID_CONTROL_AE_STATE_SEARCHING;
         }
         break;
     case ANDROID_CONTROL_AE_STATE_PRECAPTURE:
-        if (aeResults.exposures[0].converged == true) {
+        if (aeResults.converged) {
             mEvChanged = false; // converged -> reset
             if (mLastAeControls.aeLock) {
                 mCurrentAeState = ANDROID_CONTROL_AE_STATE_LOCKED;
             } else {
-                if (aeResults.flashes[0].status == rk_aiq_flash_status_torch
-                        || aeResults.flashes[0].status
-                                == rk_aiq_flash_status_pre)
-                    mCurrentAeState = ANDROID_CONTROL_AE_STATE_FLASH_REQUIRED;
-                else
-                    mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED;
+                /* TODO */
+                /* if (aeResults.flashes[0].status == rk_aiq_flash_status_torch */
+                /*         || aeResults.flashes[0].status */
+                /*                 == rk_aiq_flash_status_pre) */
+                /*     mCurrentAeState = ANDROID_CONTROL_AE_STATE_FLASH_REQUIRED; */
+                /* else */
+                /*     mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED; */
+                mCurrentAeState = ANDROID_CONTROL_AE_STATE_CONVERGED;
             }
         } // here the else is staying at the same state.
         break;
@@ -312,7 +316,7 @@ RkAEModeAuto::processResult(const rk_aiq_ae_results &aeResults,
         break;
     }
 
-    if (aeResults.exposures[0].converged == true) {
+    if (aeResults.converged) {
         if (mLastAeConvergedFlag == true) {
             mAeConvergedCount++;
             LOG2("%s: AE converged for %d frames (reqId: %d)",
@@ -335,7 +339,7 @@ RkAEModeAuto::processResult(const rk_aiq_ae_results &aeResults,
                         __FUNCTION__, mAeRunCount, reqId);
         }
     }
-    mLastAeConvergedFlag = aeResults.exposures[0].converged;
+    mLastAeConvergedFlag = aeResults.converged;
 
     updateResult(result);
 

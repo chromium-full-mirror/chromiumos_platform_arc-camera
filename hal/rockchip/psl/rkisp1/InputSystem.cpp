@@ -35,11 +35,203 @@
 namespace android {
 namespace camera2 {
 
-InputSystem::InputSystem(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl):
-    mObserver(observer),
-    mMediaCtl(mediaCtl),
+InputSystemBase::InputSystemBase(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl):
     mMediaCtlHelper(mediaCtl, this),
-    mStarted(false),
+    mObserver(observer),
+    mStarted(false)
+{
+    LOG1("@%s", __FUNCTION__);
+    std::shared_ptr<V4L2VideoNode> node;
+    mConfiguredNodesPerName.insert(std::make_pair(IMGU_NODE_NULL, node));
+    mInflightRequest.clear();
+}
+
+InputSystemBase::~InputSystemBase()
+{
+    mInflightRequest.clear();
+}
+
+status_t InputSystemBase::requestExitAndWait()
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = OK;
+
+    return status;
+}
+
+status_t InputSystemBase::configure(IStreamConfigProvider &streamConfigMgr,
+                                MediaCtlHelper::ConfigurationResults &outData)
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    mStarted = false;
+
+    status = mMediaCtlHelper.configure(streamConfigMgr, IStreamConfigProvider::CIO2);
+    if (status != OK) {
+        LOGE("Failed to configure input system.");
+        return status;
+    }
+
+    outData = mMediaCtlHelper.getConfigResults();
+
+    return status;
+}
+status_t InputSystemBase::start()
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    mStarted = true;
+
+    return status;
+}
+
+status_t InputSystemBase::stop(bool keepBuffers)
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    mStarted = false;
+
+    return status;
+}
+
+status_t InputSystemBase::releaseBufferPools()
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    return status;
+}
+
+bool InputSystemBase::isStarted()
+{
+    LOG1("@%s", __FUNCTION__);
+
+    bool value = mStarted;
+
+    return value;
+}
+
+status_t InputSystemBase::putFrame(NodeTypes isysNodeName,
+                               const V4L2Buffer *buf, int32_t reqId)
+{
+    LOG2("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    auto itRequest = mInflightRequest.find(reqId);
+    if (itRequest == mInflightRequest.end()) {
+        LOG1("mInflightRequest reqid %d, index %d", reqId, buf->index());
+        mInflightRequest.emplace(reqId, buf->index());
+    } else {
+        // edit
+        LOG2("%s: Found Pending Request for ReqId %d", __FUNCTION__, reqId);
+    }
+    return status;
+}
+
+status_t InputSystemBase::setBufferPool(NodeTypes isysNodeName,
+                                    std::vector<V4L2Buffer> &pool,
+                                    bool cached)
+{
+    LOG2("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+    V4L2BufferInfo vinfo;
+
+    mBufferPool.clear();
+
+    for (unsigned int i = 0; i < pool.size(); i++) {
+        pool.at(i).setFlags(0x0);
+        pool.at(i).setType(V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE);
+        pool.at(i).setMemory(V4L2_MEMORY_USERPTR);
+        pool.at(i).setIndex(i);
+        vinfo.vbuffer = pool.at(i);
+        vinfo.width = 1;
+        vinfo.height = 1;
+        vinfo.format = V4L2_PIX_FMT_NV21;
+        mBufferPool.push_back(vinfo);
+    }
+
+    return status;
+}
+
+status_t InputSystemBase::getOutputNodes(ConfiguredNodesPerName **nodes,
+                                            int &nodeCount)
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    *nodes = &mConfiguredNodesPerName;
+    nodeCount = 1;
+    return status;
+}
+
+std::shared_ptr<V4L2VideoNode> InputSystemBase::findOutputNode(NodeTypes isysNodeName)
+{
+    auto it = mConfiguredNodesPerName.find(isysNodeName);
+    if (it == mConfiguredNodesPerName.end()) {
+        LOGE("@%s ISYS node (%d) not found!", __FUNCTION__, isysNodeName);
+        return nullptr;
+    }
+    return it->second;
+}
+
+status_t InputSystemBase::enqueueMediaRequest(int32_t reqId)
+{
+    LOG2("@%s, reqId = %d", __FUNCTION__, reqId);
+    status_t status = NO_ERROR;
+
+    return status;
+}
+
+status_t InputSystemBase::capture(int requestId)
+{
+    LOG2("@%s: request ID: %d", __FUNCTION__, requestId);
+    status_t status = NO_ERROR;
+    unsigned int i = 0;
+
+    /* first checking if existing mediaRequest created */
+    auto itRequest = mInflightRequest.find(requestId);
+    if (itRequest == mInflightRequest.end()) {
+        LOGE("No Request pending for reqId %d, BUG!", requestId);
+        return UNKNOWN_ERROR;
+    }
+
+    int32_t idx = mInflightRequest.at(requestId);
+    // clean queue of request.
+    mInflightRequest.erase(requestId);
+
+    for (; i < mBufferPool.size(); i++) {
+        if (idx == mBufferPool.at(i).vbuffer.index())
+            break;
+    }
+
+    if (i == mBufferPool.size())
+        LOGE("can't find v4l2 buffer for request %d !", requestId);
+
+    IISysObserver::IsysMessage isysMsg;
+    isysMsg.id = IISysObserver::ISYS_MESSAGE_ID_EVENT;
+    isysMsg.data.error.status = status;
+    isysMsg.data.event.requestId = requestId;
+    /* for non isys used*/
+    isysMsg.data.event.isysNodeName = IMGU_NODE_NULL;
+    isysMsg.data.event.buffer = &(mBufferPool.at(i));
+    mObserver->notifyIsysEvent(isysMsg);
+
+    return status;
+}
+
+status_t InputSystemBase::flush()
+{
+    LOG1("@%s", __FUNCTION__);
+    status_t status = NO_ERROR;
+
+    return status;
+}
+
+InputSystem::InputSystem(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl):
+    InputSystemBase(observer, mediaCtl),
     mIsysRequestPool("IsysRequestPool"),
     mBuffersReceived(0),
     mBufferSeqNbr(0),

@@ -51,10 +51,10 @@ const uint32_t MAX_KERNEL_COUNT = 30; // max number of kernels in the kernel lis
 const std::string SENSOR_PORT_NAME("sensor:port_0");
 const std::string TPG_PORT_NAME("tpg:port_0");
 // Declare string consts
-const std::string CSI_BE = "rkisp1-cio2 ";
-const std::string CSI_RECEIVER = "rkisp1-csi2 0";
+const std::string CSI_BE = "rockchip-sy-mipi-dphy";
 
 const std::string GC_INPUT = "input";
+const std::string GC_OUTPUT = "output";
 const std::string GC_PREVIEW = "preview";
 const std::string GC_VIDEO = "video";
 const std::string GC_STILL = "still";
@@ -402,7 +402,7 @@ private:
                             int pad,
                             MediaCtlConfig* config);
     void addSelectionVideoParams(const string &entityName,
-                                 const struct v4l2_subdev_selection &select,
+                                 const struct v4l2_selection &select,
                                  MediaCtlConfig* config);
     status_t getNodeInfo(const ia_uid uid, const Node &parent, int *width, int *height);
     status_t getTPGMediaCtlData(MediaCtlConfig &mediaCtlConfig);
@@ -492,7 +492,6 @@ private:
     std::string mCSIBE;
     std::shared_ptr<MediaController> mMediaCtl;
 
-    std::vector<MediaCtlLut> mLut;
     string mMainNodeName;
     string mSecondNodeName;
 };

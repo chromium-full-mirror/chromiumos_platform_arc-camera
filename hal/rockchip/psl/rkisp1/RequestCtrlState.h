@@ -23,10 +23,10 @@
 
 #include "Camera3Request.h"
 #include "CaptureUnitSettings.h"
-#include "Rk3aPlus.h"
 #include "GraphConfig.h"
 #include "ProcUnitSettings.h"
 #include "CaptureUnit.h"
+#include "Rk3aPlus.h"
 
 namespace android {
 namespace camera2 {
@@ -53,6 +53,7 @@ enum AlgorithmState {
 struct RequestCtrlState {
     void init(Camera3Request *req, std::shared_ptr<GraphConfig> aGraphConfig);
     static void reset(RequestCtrlState* me);
+    void initAAAControls();
     CameraMetadata *ctrlUnitResult; /**< metadata results written in the
                                          context of the ControlUnit */
     Camera3Request *request;        /**< user request associated to this AIQ

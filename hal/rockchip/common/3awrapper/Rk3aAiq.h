@@ -25,25 +25,18 @@ public:
     Rk3aAiq();
     virtual ~Rk3aAiq();
 
-    bool init(const ia_binary_data* nvm_data,
-            unsigned int stats_max_width,
-            unsigned int stats_max_height,
-            unsigned int max_num_stats_in);
+    bool init(const char* xmlFilePath);
     void deinit();
-    ia_err aeRun(const rk_aiq_ae_input_params* ae_input_params,
-                  rk_aiq_ae_results** ae_results);
-    ia_err afRun(const rk_aiq_af_input_params* af_input_params,
-                  rk_aiq_af_results** af_results);
-    ia_err awbRun(const rk_aiq_awb_input_params* awb_input_params,
-                   rk_aiq_awb_results** awb_results);
-    ia_err gbceRun(const rk_aiq_gbce_input_params* gbce_input_params,
-                    rk_aiq_gbce_results** gbce_results);
-    ia_err getAiqdData(ia_binary_data* out_rk_aiq_data);
-    ia_err paRun(const rk_aiq_pa_input_params* pa_input_params,
-                   rk_aiq_pa_results** pa_results);
-    ia_err saRun(const rk_aiq_sa_input_params* sa_input_params,
-                   rk_aiq_sa_results** sa_results);
-    ia_err statisticsSet(const rk_aiq_statistics_input_params* input_params);
+    status_t aeRun(const rk_aiq_ae_input_params* ae_input_params,
+                   rk_aiq_ae_results** ae_results);
+    status_t afRun(const rk_aiq_af_input_params* af_input_params,
+                   rk_aiq_af_results** af_results);
+    status_t awbRun(const rk_aiq_awb_input_params* awb_input_params,
+                    rk_aiq_awb_results** awb_results);
+    status_t miscRun(const rk_aiq_misc_isp_input_params* misc_input_params,
+                     rk_aiq_misc_isp_results** misc_results);
+    status_t statisticsSet(const rk_aiq_statistics_input_params* input_params,
+                           const rk_aiq_exposure_sensor_descriptor *sensor_desc = nullptr);
     const char* getVersion(void);
 
     bool isInitialized() const;

@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <v4l2device.h>
-#include "RKISP1Types.h"
+#include "RKISP1Common.h"
 #include "LogHelper.h"
 #include "GraphConfigManager.h"
 #include "NodeTypes.h"
@@ -70,6 +70,8 @@ PSLConfParser::PSLConfParser(std::string& xmlName, const std::vector<SensorDrive
     mSensorIndex  = -1;
     getPSLDataFromXmlFile();
     getGraphConfigFromXmlFile();
+    // Uncomment to display all the parsed values
+    //dump();
 }
 
 PSLConfParser::~PSLConfParser()
@@ -466,6 +468,8 @@ void PSLConfParser::handleHALTuning(const char *name, const char **atts)
         info->mSupportIsoMap = ((strcmp(atts[1], "true") == 0) ? true : false);
     } else if (strcmp(name, "graphSettingsFile") == 0) {
         info->mGraphSettingsFile = atts[1];
+    } else if (strcmp(name, "iqTuningFile") == 0) {
+        info->mIqTuningFile = atts[1];
     }
 }
 // String format: "%d,%d,...,%d", or "%dx%d,...,%dx%d", or "(%d,...,%d),(%d,...,%d)

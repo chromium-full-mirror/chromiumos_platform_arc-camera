@@ -30,6 +30,8 @@
 #include "CaptureBuffer.h"
 #include "CaptureUnitSettings.h"
 #include "RequestCtrlState.h"
+#include <linux/rkisp1-config.h>
+#include "Rk3aRunner.h"
 
 namespace android {
 namespace camera2 {
@@ -38,7 +40,6 @@ class SettingsProcessor;
 class Metadata;
 
 // Forward definitions to avoid extra includes
-struct RKISP1CapturedStatistics;
 class IStreamConfigProvider;
 struct ProcUnitSettings;
 class Rk3aRunner;
@@ -123,7 +124,7 @@ public:  /* private types */
         MessageData data;
         Camera3Request* request;
         std::shared_ptr<RequestCtrlState> state;
-        std::shared_ptr<RKISP1CapturedStatistics> stats;
+        std::shared_ptr<rk_aiq_statistics_input_params> stats;
         std::shared_ptr<CaptureBuffer> rawBuffer;
         std::shared_ptr<CaptureBuffer> yuvBuffer;
         CaptureEventType type;
@@ -162,10 +163,10 @@ private:  /* Methods */
     status_t handleMessageFlush(void);
 
     status_t processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqState,
-                                      std::shared_ptr<RKISP1CapturedStatistics> &stats);
+                                      std::shared_ptr<rk_aiq_statistics_input_params> &stats);
 
     void     prepareStats(RequestCtrlState &reqState,
-                          RKISP1CapturedStatistics &s);
+                          rk_aiq_statistics_input_params &s);
     status_t completeProcessing(std::shared_ptr<RequestCtrlState> &reqState);
     status_t allocateLscResults();
     status_t acquireRequestStateStruct(std::shared_ptr<RequestCtrlState>& state);
@@ -178,7 +179,7 @@ private:  /* Members */
 
     std::map<int, std::shared_ptr<RequestCtrlState>> mWaitingForCapture;
     std::vector<std::shared_ptr<RequestCtrlState>> mPendingRequests;
-    std::shared_ptr<RKISP1CapturedStatistics>  mLatestStatistics;
+    std::shared_ptr<rk_aiq_statistics_input_params>  mLatestStatistics;
     int64_t mLatestRequestId;
 
     ImguUnit       *mImguUnit; /* ControlUnit doesn't own ImguUnit */
@@ -209,9 +210,8 @@ private:  /* Members */
     Rk3aRunner *m3ARunner;
     LensHw *mLensController;
 
-    /* Using for Af sync */
-    bool mAfFirstRun;
-    uint32_t mAfApplySequence;
+    rk_aiq_exposure_sensor_descriptor mSensorDescriptor;
+
     uint32_t mSofSequence;
     static const int16_t AWB_CONVERGENCE_WAIT_COUNT = 2;
 };  // class ControlUnit

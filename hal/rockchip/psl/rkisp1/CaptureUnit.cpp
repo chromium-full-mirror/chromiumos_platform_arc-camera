@@ -33,6 +33,7 @@
 namespace android {
 namespace camera2 {
 
+/* TODO : for non isys , frame skip and sync and ae setting may be moved to imgu  unit or control unit */
 CaptureUnit::CaptureUnit(int camId, IStreamConfigProvider &aStreamCfgProv, std::shared_ptr<MediaController> mc) :
         mCameraId(camId),
         mActiveIsysNodes(0),
@@ -132,8 +133,11 @@ status_t CaptureUnit::init()
     mMessageThread->run();
 
     mInflightRequestPool.init(MAX_REQUEST_IN_PROCESS_NUM, InflightRequestState::reset);
-
+#ifdef USED_FAKE_INPUTSYS
+    mIsys = std::make_shared<InputSystemBase>(this, mMediaCtl);
+#else
     mIsys = std::make_shared<InputSystem>(this, mMediaCtl);
+#endif
 
     //Cache the static metadata values we are going to need in the capture unit
     if (initStaticMetadata() != NO_ERROR) {
@@ -341,6 +345,7 @@ status_t CaptureUnit::handleMessageConfigStreams(Message &msg)
         return status;
     }
 
+    /* frameParams not used now ? zyc */
     outMsg.data.event.frameParams = isysConfigResult.sensorFrameParams;
 
     notifyListeners(&outMsg);
@@ -374,6 +379,11 @@ int CaptureUnit::getActiveIsysNodes(std::shared_ptr<GraphConfig> graphConfig)
             case ISYS_NODE_RAW:
                 LOG1("ISYS_NODE_RAW");
                 gcNodeName = "csi_be:output";
+                break;
+            case IMGU_NODE_NULL:
+                LOG1("IMGU_NODE_NULL");
+                /* for non isys, zyc */
+                gcNodeName = "imgu:null";
                 break;
             default:
                 LOGE("Unknown node: %d", node.first);
@@ -416,7 +426,6 @@ status_t CaptureUnit::setSensorFrameTimings()
         // case of SMIA
         return NO_ERROR;
     }
-
     return status;
 }
 
@@ -610,7 +619,11 @@ status_t CaptureUnit::enqueueIsysBuffer(std::shared_ptr<InflightRequestState> &r
 
         status = mIsys->putFrame(ISYS_NODE_RAW,
                                  &capBufPtr->v4l2Buf, reqId);
-    } else {
+    } else if (mActiveIsysNodes == IMGU_NODE_NULL) {
+        /* for non isys, zyc*/
+        status = mIsys->putFrame(IMGU_NODE_NULL,
+                                 &(capBufPtr->v4l2Buf), reqId);
+    }else {
         LOGE("Unsupport ISYS capture type!");
         return UNKNOWN_ERROR;
     }
@@ -740,9 +753,10 @@ status_t CaptureUnit::handleMessageIsysEvent(Message &msg)
 
     switch(isysNodeName) {
     case ISYS_NODE_RAW:
+    case IMGU_NODE_NULL: /* for non isys, zyc */
         status = processIsysBuffer(msg);
         break;
-    // TODO: handle other types
+        // TODO: handle other types
     default:
         outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_ERROR;
         LOGW("Unsupported event was returned from input system!Isys node: %d", isysNodeName);
@@ -817,10 +831,13 @@ status_t CaptureUnit::processIsysBuffer(Message &msg)
     state = it->second;
 
     gc = state->graphConfig;
+    /* for IMGU_NODE_NULL, shutter event should be done in imgu, zyc*/
     // notify shutter event
     if (state->shutterDone == false) {
+#ifndef USED_FAKE_INPUTSYS
         outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
         notifyListeners(&outMsg);
+#endif
         state->shutterDone = true;
     }
 
@@ -828,6 +845,15 @@ status_t CaptureUnit::processIsysBuffer(Message &msg)
         outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_RAW_BAYER;
         // Send notification
         LOG2("ISYS event %d arrived", outMsg.data.event.type);
+        notifyListeners(&outMsg);
+    } else if (isysNode == IMGU_NODE_NULL) {
+        outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_RAW_BAYER;
+        LOG2("ISYS event %d arrived", outMsg.data.event.type);
+        #ifdef USED_FAKE_INPUTSYS
+        // buffer not needed in this request, recycle to the pool
+        outMsg.data.event.pixelBuffer = NULL;
+        isysBufferPtr.reset();
+        #endif
         notifyListeners(&outMsg);
     } else {
         LOGE("Unsupprted isys node");

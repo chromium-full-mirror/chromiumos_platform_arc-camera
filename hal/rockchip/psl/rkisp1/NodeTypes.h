@@ -38,7 +38,8 @@ enum NodeTypes {
     IMGU_NODE_PARAM =           1 << 6,
     IMGU_NODE_STAT =            1 << 7,
     IMGU_NODE_INPUT =           1 << 8,
-    ISYS_NODE_RAW =             1 << 9
+    IMGU_NODE_OUTPUT =          1 << 9,
+    ISYS_NODE_RAW =             1 << 10
 };
 
 int getDefaultMemoryType(NodeTypes node);

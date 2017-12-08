@@ -128,7 +128,8 @@ status_t JpegEncodeTask::handleMessageSettings(ProcUnitSettings &procSettings)
     // error between AIQ rk_aiq_manual_focus_parameters::manual_focus_distance
     // and result 'current_focus_distance'. Will be fixed by AIQ utility
     // function to get around the rounding error. Once done, this comment is void
-    exifCache.focusDistance = capSettings->aiqResults.afResults.current_focus_distance;
+    /* TODO */
+    /* exifCache.focusDistance = capSettings->aiqResults.afResults.current_focus_distance; */
 
     // TODO:
     // CAM_AE_MODE_SHUTTER_PRIORITY,  // AIQ default?

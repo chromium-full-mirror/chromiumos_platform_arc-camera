@@ -1297,10 +1297,11 @@ status_t V4L2VideoNode::setBufferPool(std::vector<V4L2Buffer> &pool,
             vinfo.cache_flags = cacheflags;
 
         vinfo.vbuffer = pool.at(i);
+#if 0 //buffer info isn't available before qbuf, zyc
         if (memType == V4L2_MEMORY_USERPTR) {
             vinfo.data = (void*)(pool[i].userptr());
         }
-
+#endif
         ret = newBuffer(i, vinfo, memType);
         if (ret < 0) {
             LOGE("Error querying buffers status");
@@ -1453,6 +1454,7 @@ int V4L2VideoNode::qbuf(V4L2BufferInfo *buf)
         return ret;
     }
     mBuffersInDevice++;
+    LOG2("VIDIOC_QBUF, index=%u, device(%s), mBuffersInDevice(%d)", buf->vbuffer.index(), mName.c_str(), mBuffersInDevice.load());
     return ret;
 }
 
@@ -1466,11 +1468,14 @@ int V4L2VideoNode::dqbuf(V4L2BufferInfo *buf)
     v4l2_buf.setType(mBufType);
 
     ret = pioctl(mFd, VIDIOC_DQBUF, v4l2_buf.get(), mName.c_str());
+
     if (ret < 0) {
         LOGE("VIDIOC_DQBUF failed: %s", strerror(errno));
         return ret;
     }
     mBuffersInDevice--;
+    LOG2("VIDIOC_DQBUF, index=%u, device(%s), mBuffersInDevice(%d)",
+            v4l2_buf.index(), mName.c_str(), mBuffersInDevice.load());
     return ret;
 }
 
@@ -1548,7 +1553,7 @@ int V4L2VideoNode::newBuffer(int index, V4L2BufferInfo &buf, int memType)
 
     if (memType == V4L2_MEMORY_USERPTR) {
         vbuf.userptr((unsigned long)(buf.data));
-    } // For MMAP memory the user will do the mmap to get the ptr
+    }
 
     buf.length = vbuf.length();
     LOG1("index %u", vbuf.index());
@@ -1559,6 +1564,10 @@ int V4L2VideoNode::newBuffer(int index, V4L2BufferInfo &buf, int memType)
         LOG1("memory MMAP: offset 0x%X", vbuf.offset());
     } else if (memType == V4L2_MEMORY_USERPTR) {
         LOG1("memory USRPTR:  %p", (void*)vbuf.userptr());
+    } else if (memType == V4L2_MEMORY_DMABUF) {
+        LOG1("memory DMABUF:  %d", vbuf.fd());
+    } else {
+        LOGE("not support memory type %d", memType);
     }
     LOG1("length %u", vbuf.length());
     return ret;

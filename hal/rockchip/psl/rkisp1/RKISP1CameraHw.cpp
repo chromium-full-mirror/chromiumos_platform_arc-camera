@@ -76,7 +76,14 @@ RKISP1CameraHw::init()
     }
 
     std::string imguMediaDevice = PSLConfParser::getImguMediaDevice();
-    mImguMediaCtl = std::make_shared<MediaController>(imguMediaDevice.c_str());
+
+    //HACK: No sensorMediaDevice for rk, zyc
+    if (sensorMediaDevice == imguMediaDevice) {
+        LOGI("has only one media dev !");
+        mImguMediaCtl = mMediaCtl;
+    } else
+        mImguMediaCtl = std::make_shared<MediaController>(imguMediaDevice.c_str());
+
     status = mImguMediaCtl->init();
     if (status != NO_ERROR) {
         LOGE("Error initializing Media Controller");
@@ -290,6 +297,10 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
             GRALLOC_USAGE_HW_CAMERA_WRITE;
 
     camera3_stream_t* stillStream = findStreamForStillCapture(activeStreams);
+
+    //HACK: rk needn't reconfig stream for still case, zyc
+    //this will cause recording failed, comment for now,zyc
+    //stillStream = NULL;
     for (unsigned int i = 0; i < activeStreams.size(); i++) {
         activeStreams[i]->max_buffers = maxBufs;
         activeStreams[i]->usage |= usage;
@@ -315,6 +326,7 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
     if (mStreamsVideo.empty()) {
         mUseCase = USECASE_STILL;
     }
+
     LOG1("%s: select usecase %d, video/still stream num: %zu/%zu", __FUNCTION__,
             mUseCase, mStreamsVideo.size(), mStreamsStill.size());
 

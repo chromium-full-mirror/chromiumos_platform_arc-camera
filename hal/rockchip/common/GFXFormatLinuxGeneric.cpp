@@ -105,6 +105,10 @@ int v4L2Fmt2GFXFmt(int v4l2Fmt)
 #endif
         gfxFmt = HAL_PIXEL_FORMAT_YV12;
         break;
+    case V4L2_META_FMT_RK_ISP1_PARAMS:
+    case V4L2_META_FMT_RK_ISP1_STAT_3A:
+        gfxFmt = HAL_PIXEL_FORMAT_RAW_OPAQUE;
+        break;
     case V4L2_PIX_FMT_NV21:
         gfxFmt = HAL_PIXEL_FORMAT_YCrCb_420_SP;
         break;

@@ -43,70 +43,19 @@ NAMESPACE_DECLARATION {
 class Rk3aPlus : public Rk3aCore {
 public:
     explicit Rk3aPlus(int camId);
-    status_t initAIQ(int maxGridW = MAX_STATISTICS_WIDTH,
-                     int maxGridH = MAX_STATISTICS_HEIGHT,
-                     ia_binary_data nvmData = {nullptr,0},
-                     const char* sensorName = nullptr);
+    status_t initAIQ(const char* sensorName = nullptr);
 
     rk_aiq_frame_use getFrameUseFromIntent(const CameraMetadata * settings);
-
-    status_t fillAeInputParams(const CameraMetadata *settings,
-                               AeInputParams &aeInputParams);
-
-    status_t fillAwbInputParams(const CameraMetadata *settings,
-                               AwbInputParams &awbInputParams);
-
-    status_t fillAfInputParams(const CameraMetadata *settings,
-                               AfInputParams &afInputParams);
-
-    status_t fillPAInputParams(const CameraMetadata &settings,
-                               PAInputParams &paInputParams) const;
-
-    status_t fillSAInputParams(const CameraMetadata &settings,
-                               SAInputParams &saInputParams) const;
 
     /*
      * static common operation
      */
-    static status_t reFormatLensShadingMap(const LSCGrid &inputLscGrid,
-                                           float *dstLscGridRGGB);
-    static status_t storeLensShadingMap(const LSCGrid &inputLscGrid,
-                                        LSCGrid &resizeLscGrid,
-                                        float *dstLscGridRGGB);
-
-    static status_t deepCopyAiqResults(AiqResults &dst,
-                                       const AiqResults &src,
-                                       bool onlyCopyUpdatedSAResults = false);
-    static status_t deepCopyAEResults(rk_aiq_ae_results *dst, const rk_aiq_ae_results *src);
-    static status_t deepCopyGBCEResults(rk_aiq_gbce_results *dst,
-                                 const rk_aiq_gbce_results *src);
-    static status_t deepCopyPAResults(rk_aiq_pa_results *dst, const rk_aiq_pa_results *src);
-    static status_t deepCopySAResults(rk_aiq_sa_results *dst, const rk_aiq_sa_results *src);
-
     float getMinFocusDistance() const { return mMinFocusDistance; }
-
-    char mapUiImageEnhancement2Aiq(int uiValue);
 
 private:
     // prevent copy constructor and assignment operator
     Rk3aPlus(const Rk3aPlus& other);
     Rk3aPlus& operator=(const Rk3aPlus& other);
-
-    void parseMeteringRegion(const CameraMetadata *settings,
-                             int tagId, CameraWindow &meteringWindow);
-
-    void parseAfTrigger(const CameraMetadata &settings,
-                            rk_aiq_af_input_params &afInputParams,
-                            uint8_t &trigger) const;
-    status_t parseAFMode(const CameraMetadata *settings,
-                            rk_aiq_af_input_params &afInputParams,
-                            uint8_t &afMode) const;
-    void setAfMode(rk_aiq_af_input_params &afInputParams,
-                   uint8_t afMode) const;
-    bool afModeIsAvailable(uint8_t afMode ) const;
-
-    status_t parseFocusDistance(const CameraMetadata &settings,
-                                rk_aiq_af_input_params &afCfg) const;
 
 // private members
 private:

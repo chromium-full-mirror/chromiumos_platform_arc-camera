@@ -386,7 +386,9 @@ status_t SensorHwOp::getMinimumFrameDuration(unsigned int &llp, unsigned int &fl
     CLEAR(sensorModeControl);
     sensorModeControl.id = V4L2_CID_VBLANK;
     statusV = pPixelArraySubdev->queryControl(sensorModeControl);
-    vertBlank = sensorModeControl.minimum;
+    //modified by rk
+    /* vertBlank = sensorModeControl.minimum; */
+    vertBlank = sensorModeControl.default_value;
     LOG2("%s, queryControl statusV: %d, vertBlank, %d", __FUNCTION__, statusV, vertBlank);
     if (statusV == OK)
         fll = vertBlank + pCropHeight;

@@ -24,7 +24,6 @@
 #include "ImguUnit.h"
 #include "LogHelper.h"
 #include "PerformanceTraces.h"
-#include "RKISP1CapturedStatistics.h"
 #include "workers/InputFrameWorker.h"
 #include "workers/OutputFrameWorker.h"
 #include "workers/StatisticsWorker.h"
@@ -56,15 +55,6 @@ ImguUnit::ImguUnit(int cameraId,
         return;
     }
     mMessageThread->run();
-
-    mRgbsGridBuffPool = std::make_shared<SharedItemPool<rk_aiq_rgbs_grid>>("RgbsGridBuffPool");
-    mAfFilterBuffPool = std::make_shared<SharedItemPool<rk_aiq_af_grid>>("AfFilterBuffPool");
-
-    status_t status = allocatePublicStatBuffers(PUBLIC_STATS_POOL_SIZE);
-    if (status != NO_ERROR) {
-        LOGE("Failed to allocate statistics, status: %d.", status);
-        return;
-    }
 }
 
 ImguUnit::~ImguUnit()
@@ -94,10 +84,6 @@ ImguUnit::~ImguUnit()
 
     cleanListener();
     clearWorkers();
-
-    freePublicStatBuffers();
-    mRgbsGridBuffPool.reset();
-    mAfFilterBuffPool.reset();
 }
 
 void ImguUnit::clearWorkers()
@@ -110,105 +96,6 @@ void ImguUnit::clearWorkers()
     }
     mFirstWorkers.clear();
     mListenerDeviceWorkers.clear();
-}
-
-/**
- * allocatePublicStatBuffers
- *
- * This method allocates the memory for the pool of 3A statistics.
- * The pools are also initialized here.
- *
- * These statistics are the public stats that will be sent to the 3A algorithms.
- *
- * Please do not confuse with the buffers allocated by the driver to get
- * the HW generated statistics. Those are allocated at createStatsBufferPool()
- *
- * The symmetric method to this is freePublicStatBuffers
- * The buffers allocated here are the output of the conversion process
- * from HW generated statistics. This processing is done using the
- * parameter adaptor class.
- *
- * \param[in] numBufs: number of buffers to initialize
- *
- * \return OK everything went fine
- * \return NO_MEMORY failed to allocate
- */
-status_t ImguUnit::allocatePublicStatBuffers(int numBufs)
-{
-    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    status_t status = OK;
-    int maxGridSize;
-    int allocated = 0;
-    std::shared_ptr<rk_aiq_rgbs_grid> rgbsGrid = nullptr;
-    std::shared_ptr<rk_aiq_af_grid> afGrid = nullptr;
-
-    maxGridSize = RKISP1_MAX_STATISTICS_WIDTH * RKISP1_MAX_STATISTICS_HEIGHT;
-    status = mAfFilterBuffPool->init(numBufs);
-    status |= mRgbsGridBuffPool->init(numBufs);
-    if (status != OK) {
-        LOGE("Failed to initialize 3A statistics pools");
-        freePublicStatBuffers();
-        return NO_MEMORY;
-    }
-
-    for (allocated = 0; allocated < numBufs; allocated++) {
-        status = mAfFilterBuffPool->acquireItem(afGrid);
-        status |= mRgbsGridBuffPool->acquireItem(rgbsGrid);
-
-        if (status != OK ||
-            afGrid.get() == nullptr ||
-            rgbsGrid.get() == nullptr) {
-            LOGE("Failed to acquire 3A statistics memory from pools");
-            freePublicStatBuffers();
-            return NO_MEMORY;
-        }
-
-        rgbsGrid->blocks_ptr = new rgbs_grid_block[maxGridSize];
-        rgbsGrid->grid_height = 0;
-        rgbsGrid->grid_width = 0;
-
-        afGrid->filter_response_1 = new int[maxGridSize];
-        afGrid->filter_response_2 = new int[maxGridSize];
-        afGrid->block_height = 0;
-        afGrid->block_width = 0;
-        afGrid->grid_height = 0;
-        afGrid->grid_width = 0;
-
-    }
-    return NO_ERROR;
-}
-
-void ImguUnit::freePublicStatBuffers()
-{
-    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    std::shared_ptr<rk_aiq_rgbs_grid> rgbsGrid = nullptr;
-    std::shared_ptr<rk_aiq_af_grid> afGrid = nullptr;
-    status_t status = OK;
-    if (!mAfFilterBuffPool->isFull() ||
-        !mRgbsGridBuffPool->isFull()) {
-        LOGE("We are leaking stats- AF:%s RGBS:%s",
-                mAfFilterBuffPool->isFull()? "NO" : "YES",
-                mRgbsGridBuffPool->isFull()? "NO" : "YES");
-    }
-    size_t availableItems = mAfFilterBuffPool->availableItems();
-    for (size_t i = 0; i < availableItems; i++) {
-        status = mAfFilterBuffPool->acquireItem(afGrid);
-        if (status == OK && afGrid.get() != nullptr) {
-            DELETE_ARRAY_AND_NULLIFY(afGrid->filter_response_1);
-            DELETE_ARRAY_AND_NULLIFY(afGrid->filter_response_2);
-        } else {
-            LOGE("Could not acquire filter response [%zu] for deletion - leak?", i);
-        }
-    }
-    availableItems = mRgbsGridBuffPool->availableItems();
-    for (size_t i = 0; i < availableItems; i++) {
-        status = mRgbsGridBuffPool->acquireItem(rgbsGrid);
-        if (status == OK && rgbsGrid.get() != nullptr) {
-            DELETE_ARRAY_AND_NULLIFY(rgbsGrid->blocks_ptr);
-        } else {
-            LOGE("Could not acquire RGBS grid [%zu] for deletion - leak?", i);
-        }
-    }
 }
 
 status_t
@@ -300,8 +187,15 @@ status_t ImguUnit::mapStreamWithDeviceNode()
     NodeTypes listenToNode = IMGU_NODE_NULL;
 
     if (streamNum == 1) {
+        //HACK: Force use video, rk use the IMGU_NODE_VIDEO firstly.
+        //if second stream is needed, then IMGU_NODE_VF_PREVIEW will be usde.
+        //and rk has no IMGU_NODE_PV_PREVIEW.
+#if 0
         // Use preview for still capture to get same FOV with 2 streams preview case.
         previewIdx = 0;
+#else
+        videoIdx = 0;
+#endif
     } else if (streamNum == 2) {
         videoIdx = (streamSizeGE(availableStreams[0], availableStreams[1])) ? 0 : 1;
         previewIdx = videoIdx ? 0 : 1;
@@ -336,24 +230,15 @@ status_t ImguUnit::mapStreamWithDeviceNode()
         return UNKNOWN_ERROR;
     }
 
-    // W/A: use postview node only for still pipe due to FOV issue
-    // Select settings only according to jpeg stream
-    if (blobNum && !isVideoSnapshot) {
-        LOG1("still case: map %p to pv node", mActiveStreams.blobStreams[0]);
-        mStreamNodeMapping[IMGU_NODE_PV_PREVIEW] = mActiveStreams.blobStreams[0];
-        for (auto* s : mActiveStreams.yuvStreams) {
-            mStreamListenerMapping[s] = IMGU_NODE_PV_PREVIEW;
-        }
-        return OK;
+    if (previewIdx >= 0) {
+        mStreamNodeMapping[IMGU_NODE_VF_PREVIEW] = availableStreams[previewIdx];
+        mStreamNodeMapping[IMGU_NODE_PV_PREVIEW] = mStreamNodeMapping[IMGU_NODE_VF_PREVIEW];
+        LOG1("@%s, %d stream %p size preview: %dx%d, format %s", __FUNCTION__,
+             previewIdx, availableStreams[previewIdx],
+             availableStreams[previewIdx]->width, availableStreams[previewIdx]->height,
+             METAID2STR(android_scaler_availableFormats_values,
+                        availableStreams[previewIdx]->format));
     }
-
-    mStreamNodeMapping[IMGU_NODE_VF_PREVIEW] = availableStreams[previewIdx];
-    mStreamNodeMapping[IMGU_NODE_PV_PREVIEW] = mStreamNodeMapping[IMGU_NODE_VF_PREVIEW];
-    LOG1("@%s, %d stream %p size preview: %dx%d, format %s", __FUNCTION__,
-         previewIdx, availableStreams[previewIdx],
-         availableStreams[previewIdx]->width, availableStreams[previewIdx]->height,
-         METAID2STR(android_scaler_availableFormats_values,
-                    availableStreams[previewIdx]->format));
 
     if (videoIdx >= 0) {
         mStreamNodeMapping[IMGU_NODE_VIDEO] = availableStreams[videoIdx];
@@ -397,6 +282,10 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
 
     clearWorkers();
     // Open and configure imgu video nodes
+
+    //HACK: rk has only vido config, set it as default,zyc
+    mCurPipeConfig = &mPipeConfigs[PIPE_VIDEO_INDEX];
+
     status = mMediaCtlHelper.configure(mGCM, IStreamConfigProvider::IMGU_COMMON);
     if (status != OK)
         return UNKNOWN_ERROR;
@@ -462,14 +351,20 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
             videoConfig->pollableWorkers.push_back(outWorker);
             videoConfig->nodes.push_back(outWorker->getNode());
             setStreamListeners(it.first, outWorker);
+            //shutter event for non isys, zyc
+            mListenerDeviceWorkers.push_back(outWorker.get());
         } else if (it.first == IMGU_NODE_VF_PREVIEW) {
             vfWorker = std::make_shared<OutputFrameWorker>(it.second, mCameraId,
                 mStreamNodeMapping[it.first], it.first, pipelineDepth);
             setStreamListeners(it.first, vfWorker);
+            //shutter event for non isys, zyc
+            mListenerDeviceWorkers.push_back(vfWorker.get());
         } else if (it.first == IMGU_NODE_PV_PREVIEW) {
             pvWorker = std::make_shared<OutputFrameWorker>(it.second, mCameraId,
                 mStreamNodeMapping[it.first], it.first, pipelineDepth);
             setStreamListeners(it.first, pvWorker);
+            //shutter event for non isys, zyc
+            mListenerDeviceWorkers.push_back(pvWorker.get());
         } else if (it.first == IMGU_NODE_RAW) {
             LOGW("Not implemented"); // raw
             continue;
@@ -666,8 +561,12 @@ status_t ImguUnit::processNextRequest()
 
     if (msg->cbMetadataMsg.updateMeta) {
         updateProcUnitResults(*request, msg->pMsg.processingSettings);
+
+        #ifndef USED_FAKE_INPUTSYS
         //return the metadata
+        //not return here for non isys, zyc, returned after fram grabbed, zyc
         request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
+        #endif
     }
 
     mMessagesUnderwork.push_back(msg);
@@ -836,6 +735,13 @@ ImguUnit::startProcessing()
     for (;it != mCurPipeConfig->deviceWorkers.end(); ++it) {
         status |= (*it)->run();
     }
+
+#ifdef USED_FAKE_INPUTSYS
+    //return control result here, zyc.
+    std::shared_ptr<DeviceMessage> msg = *(mMessagesUnderwork.begin());
+    Camera3Request *request = msg->cbMetadataMsg.request;
+    request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
+#endif
 
     it = mCurPipeConfig->deviceWorkers.begin();
     for (;it != mCurPipeConfig->deviceWorkers.end(); ++it) {
@@ -1053,6 +959,21 @@ ImguUnit::handleMessageFlush(void)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
     mPollerThread->flush(true);
+
+    //TODO, should be removed here, zyc
+    //now flush is always called before reconfiging streams,
+    //here just to make subsequent reconfiging streams call happy.
+    // Stop all video nodes
+    if (mCurPipeConfig) {
+        status_t status;
+        for (const auto &it : mCurPipeConfig->deviceWorkers) {
+            status = (*it).stopWorker();
+            if (status != OK) {
+                LOGE("Fail to stop wokers");
+                return status;
+            }
+        }
+    }
 
     clearWorkers();
     return NO_ERROR;

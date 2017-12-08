@@ -43,7 +43,7 @@ public:
     void returnBuffer(CaptureBuffer* buffer);
 
     status_t createBufferPools(int numBufs, int numSkips,
-            std::shared_ptr<InputSystem> isys);
+            std::shared_ptr<InputSystemBase> isys);
 
     status_t acquireItem(std::shared_ptr<CaptureBuffer> &capBuffer);
     status_t acquireCaptureSkipBuffer(std::shared_ptr<CaptureBuffer> &capBuffer); /* Skip buffers are used to track aiq settings */

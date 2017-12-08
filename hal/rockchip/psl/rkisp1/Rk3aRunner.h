@@ -18,26 +18,23 @@
  * limitations under the License.
  */
 
-#ifndef PSL_RKISP1_AAARUNNER_H_
-#define PSL_RKISP1_AAARUNNER_H_
+#ifndef PSL_RKISP1_Rk3aRunner_H_
+#define PSL_RKISP1_Rk3aRunner_H_
 
 #include "RequestCtrlState.h"
+#include "Rk3aPlus.h"
+#include "RkAEStateMachine.h"
+#include "RkAFStateMachine.h"
+#include "RkAWBStateMachine.h"
 
 namespace android {
 namespace camera2 {
-
-class RkAEStateMachine;
-class RkAFStateMachine;
-class RkAWBStateMachine;
-
-class SettingsProcessor;
-class LensHw;
 
 class Rk3aRunner
 {
 public:
     Rk3aRunner(int cameraId, Rk3aPlus *aaaWrapper, SettingsProcessor *settingsProcessor, LensHw *lensController);
-    status_t init(bool digiGainOnSensor);
+    status_t init();
     virtual ~Rk3aRunner();
 
     void reset();
@@ -47,36 +44,22 @@ public:
     AiqResults &getLatestResults() { return mLatestResults; }
     void updateInputParams(const AiqInputParams &update) { mLatestInputParams = update; }
 
-    status_t allocateLscTable(int tableSize);
-    void initLsc(AiqResults &results, uint32_t lscSize) const;
+    /* status_t allocateLscTable(int tableSize); */
+    /* void initLsc(AiqResults &results, uint32_t lscSize) const; */
 
 private:
-    status_t updateNeutralColorPoint(RequestCtrlState &reqAiqCfg);
     status_t processAeResults(RequestCtrlState &reqState);
-    status_t processAfResults(RequestCtrlState &reqState);
-    status_t processAfTriggers(RequestCtrlState &reqAiqCfg);
-    status_t processSAResults(RequestCtrlState &reqState);
     status_t processAwbResults(RequestCtrlState &reqState);
-
-    void applyDigitalGain(RequestCtrlState &reqState, float digitalGain) const;
-    status_t applyTonemaps(RequestCtrlState &reqState);
-
-    float interpolate(float pos, const float *src, int srcSize) const;
-    void interpolateArray(const float *src, int srcSize, float *dst, int dstSize) const;
+    status_t processAfTriggers(RequestCtrlState &reqAiqCfg);
+    status_t processAfResults(RequestCtrlState &reqState);
 
 private:
     int mCameraId;
-    AiqResults  mLatestResults;
-    AiqInputParams mLatestInputParams;
-    Rk3aPlus *m3aWrapper;
 
-    // LSC data
-    float mResizeLscGridR[MAX_LSC_GRID_SIZE];
-    float mResizeLscGridGr[MAX_LSC_GRID_SIZE];
-    float mResizeLscGridGb[MAX_LSC_GRID_SIZE];
-    float mResizeLscGridB[MAX_LSC_GRID_SIZE];
-    float mLscGridRGGB[MAX_LSC_GRID_SIZE * 4];
-    float mLscOffGrid[MAX_LSC_GRID_SIZE * 4];
+    AiqInputParams mLatestInputParams;
+    AiqResults  mLatestResults;
+
+    Rk3aPlus *m3aWrapper;
 
     /**
      * To be handled by the AE state machine
@@ -91,24 +74,14 @@ private:
     /**
      * To be handled by the AWB state machine
      */
-    RkAWBStateMachine    *mAwbState;      /**< AWB state machine */
+    /**< AWB state machine */
+    RkAWBStateMachine    *mAwbState;
 
     LensHw              *mLensController; /* Rk3aRunner doesn't own mLensController */
-
-    float mLastSaGain; /**< digital gain applied on last saved LSC Table */
-
     SettingsProcessor *mSettingsProcessor; /* Rk3aRunner doesn't owns this */
-
-    bool mDigiGainOnSensor;
-
-    static const int PRECAP_TIME_ALIVE = 15; /*!< Precapture results validity,
-                                                  //counted in request id's */
-    AiqResults       mPrecaptureResults;     /*!< Results from precapture, to be
-                                                  used in the actual still capture */
-    int              mPrecaptureResultRequestId;
 };
 
 } /* namespace camera2 */
 } /* namespace android */
 
-#endif /* PSL_RKISP1_AAARUNNER_H_ */
+#endif /* PSL_RKISP1_Rk3aRunner_H_ */

@@ -22,34 +22,11 @@
 #include "RKISP1Common.h"
 #include "Camera3GFXFormat.h"
 #include "LogHelper.h"
-#include "RKISP1Types.h"
 namespace android {
 namespace camera2 {
 
-// consts from RKISP1Types.h
 const int JPEG_QUALITY_DEFAULT = 95;
 const int THUMBNAIL_QUALITY_DEFAULT = 90;
-
-int isysRawBpp(int fourcc)
-{
-    LOG1("%s: ISYS RAW format %s", __FUNCTION__, v4l2Fmt2Str(fourcc));
-    if (!isBayerFormat(fourcc)) {
-        LOGE("%s: CaptureUnit RAW format %s is not bayer", __FUNCTION__, v4l2Fmt2Str(fourcc));
-        return INVALID_BPP;
-    }
-
-    const CameraFormatBridge* afb = getCameraFormatBridge(fourcc);
-    return afb->depth;
-}
-
-bool isWideAspectRatio(int width, int height)
-{
-    double value = (double)width / height;
-    if (value > 1.7)
-        return true; // 16:9
-    else
-        return false; // 4:3
-}
 
 }  // namespace camera2
 }  // namespace android

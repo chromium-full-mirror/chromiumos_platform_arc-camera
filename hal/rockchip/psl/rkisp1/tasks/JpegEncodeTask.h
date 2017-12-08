@@ -24,7 +24,7 @@
 #include "ExecuteTaskBase.h"
 #include "ImgEncoder.h"
 #include "JpegMaker.h"
-#include "RKISP1Types.h"
+#include "RKISP1Common.h"
 
 namespace android {
 namespace camera2 {
