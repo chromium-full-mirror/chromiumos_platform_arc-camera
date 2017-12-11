@@ -52,7 +52,7 @@ private:
 class StatisticsWorker: public FrameWorker, public ICaptureEventSource
 {
 public:
-    StatisticsWorker(std::shared_ptr<V4L2VideoNode> node, int cameraId);
+    StatisticsWorker(std::shared_ptr<V4L2VideoNode> node, int cameraId, size_t pipelineDepth);
     virtual ~StatisticsWorker();
 
     virtual status_t configure(std::shared_ptr<GraphConfig> &config);

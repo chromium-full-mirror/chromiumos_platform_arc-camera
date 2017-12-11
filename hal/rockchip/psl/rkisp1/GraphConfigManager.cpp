@@ -695,13 +695,6 @@ const MediaCtlConfig* GraphConfigManager::getMediaCtlConfig(IStreamConfigProvide
      * of sensor mode for a new request.
      */
 
-    if (type == CIO2) {
-        if (mMediaCtlConfigs[type].mControlParams.size() < 1) {
-            return nullptr;
-        }
-    } else if (mMediaCtlConfigs[type].mLinkParams.size() < 1) {
-        return nullptr;
-    }
     return &mMediaCtlConfigs[type];
 }
 

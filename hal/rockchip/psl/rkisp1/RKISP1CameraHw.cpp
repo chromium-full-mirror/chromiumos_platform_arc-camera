@@ -274,9 +274,6 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
 
     camera3_stream_t* stillStream = findStreamForStillCapture(activeStreams);
 
-    //HACK: rk needn't reconfig stream for still case, zyc
-    //this will cause recording failed, comment for now,zyc
-    //stillStream = NULL;
     for (unsigned int i = 0; i < activeStreams.size(); i++) {
         activeStreams[i]->max_buffers = maxBufs;
         activeStreams[i]->usage |= usage;
@@ -301,6 +298,9 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
     if (mStreamsVideo.empty()) {
         mUseCase = USECASE_STILL;
     }
+
+    //rk needn't reconfigstream for still case, we just use USECASE_VIDEO always.
+    mStreamsVideo = mStreamsStill;
 
     LOG1("%s: select usecase %d, video/still stream num: %zu/%zu", __FUNCTION__,
             mUseCase, mStreamsVideo.size(), mStreamsStill.size());

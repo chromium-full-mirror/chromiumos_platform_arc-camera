@@ -54,12 +54,14 @@ public:
     std::shared_ptr<V4L2VideoNode> *activeDevices;
     int polledDevices;
     int numDevices;
+    bool isAllPolled;
     IPollEventListener::PollEventMessageId pollMsgId;
 
     MessagePollEvent() : requestId(-1),
             activeDevices(nullptr),
             polledDevices(0),
             numDevices(0),
+            isAllPolled(false),
             pollMsgId(IPollEventListener::POLL_EVENT_ID_ERROR) {}
 };
 
@@ -86,10 +88,10 @@ public:
     virtual status_t prepareRun(std::shared_ptr<DeviceMessage> msg) = 0;
     virtual status_t run() = 0;
     virtual status_t postRun() = 0;
+    virtual std::shared_ptr<V4L2VideoNode> getNode() = 0;
 
 protected:
-    std::shared_ptr<DeviceMessage> mMsg; /*!Set in prepareRun and should be valid until
-                           postRun is called */
+    std::vector<std::shared_ptr<DeviceMessage>> mMsgQue;
 
     int mCameraId;
 private:

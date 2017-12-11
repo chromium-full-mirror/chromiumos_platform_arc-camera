@@ -437,16 +437,6 @@ status_t SyncManager::setParameters(std::shared_ptr<CaptureUnitSettings> &settin
 status_t SyncManager::handleMessageSetParams(Message &msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-    if (mQueuedSettings.size() > 0) {
-        std::vector<std::shared_ptr<CaptureUnitSettings>>::iterator it;
-        for (it = mQueuedSettings.begin(); it != mQueuedSettings.end(); ++it) {
-            if ((*it)->inEffectFrom == std::shared_ptr<CaptureUnitSettings>(msg.settings)->inEffectFrom) {
-                mQueuedSettings.erase(it);
-                it--;
-            }
-        }
-    }
-
     mQueuedSettings.push_back(msg.settings);
 
     return OK;
@@ -562,11 +552,7 @@ status_t SyncManager::handleMessageSOF(Message &msg)
          * Then remove it from the Q.
          */
         // TODO: use frame idx for algo after stats rate meet out request
-        /* mQueuedSettings[0]->inEffectFrom = mQueuedSettings[0]->aiqResults.requestId; */
-        /* mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id + mExposureDelay; */
-        //need debug,the ineffectFrom should be the frame id + mExposureDelay,
-        //but if + mExposureDelay , the inEffect time beyond mExposureDelay
-        mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id;
+        mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id + mExposureDelay;
         mQueuedSettings.erase(mQueuedSettings.begin());
     }
 

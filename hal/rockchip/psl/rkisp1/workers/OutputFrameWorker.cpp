@@ -45,6 +45,7 @@ OutputFrameWorker::OutputFrameWorker(std::shared_ptr<V4L2VideoNode> node, int ca
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     if (mNode)
         LOG1("@%s, node name:%d, device name:%s", __FUNCTION__, nodeName, mNode->name());
+	mOutputBufferQue.clear();
 }
 
 OutputFrameWorker::~OutputFrameWorker()
@@ -88,9 +89,7 @@ status_t OutputFrameWorker::configure(std::shared_ptr<GraphConfig> &/*config*/)
     mNeedPostProcess = mProcessor.needPostProcess();
 
     mIndex = 0;
-    // If using internal buffer, only one buffer is required.
-    if (mNeedPostProcess)
-        mPipelineDepth = 1;
+
     ret = setWorkerDeviceBuffers(
         mNeedPostProcess ? V4L2_MEMORY_MMAP : getDefaultMemoryType(mNodeName));
     CheckError((ret != OK), ret, "@%s set worker device buffers failed.",
@@ -124,7 +123,6 @@ status_t OutputFrameWorker::configure(std::shared_ptr<GraphConfig> &/*config*/)
 status_t OutputFrameWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-    mMsg = msg;
     status_t status = NO_ERROR;
 
     if (!mStream) {
@@ -134,7 +132,7 @@ status_t OutputFrameWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
         return NO_ERROR;
     }
 
-    Camera3Request* request = mMsg->cbMetadataMsg.request;
+    Camera3Request* request = msg->cbMetadataMsg.request;
     std::shared_ptr<CameraBuffer> buffer = findBuffer(request, mStream);
     if (buffer.get()) {
         // Work for mStream
@@ -146,7 +144,7 @@ status_t OutputFrameWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
             buffer->getOwner()->captureDone(buffer, request);
             return status;
         }
-        mOutputBuffer = buffer;
+        mOutputBufferQue.push_back(buffer);
         mAllDone = false;
         mPollMe = true;
     } else if (checkListenerBuffer(request)) {
@@ -163,6 +161,7 @@ status_t OutputFrameWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
         mPollMe = false;
         return NO_ERROR;
     }
+    mMsgQue.push_back(msg);
 
     /*
      * store the buffer in a map where the key is the terminal UID
@@ -197,6 +196,7 @@ status_t OutputFrameWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
         mWorkingBuffer = buffer;
     }
     status |= mNode->putFrame(mBuffers[mIndex]);
+    mIndex = (mIndex + 1) % mPipelineDepth;
 
     return (status < 0) ? status : OK;
 }
@@ -205,6 +205,17 @@ status_t OutputFrameWorker::run()
 {
     status_t status = NO_ERROR;
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    std::shared_ptr<DeviceMessage> mMsg;
+    if (mMsgQue.empty()) {
+        LOG2("%s:%d: No buffer queued before grabFrame, is a bug , fix me", __func__, __LINE__);
+        return OK;
+    }
+    mMsg = *(mMsgQue.begin());
+
+    if (!mOutputBufferQue.empty())
+        mOutputBuffer = *(mOutputBufferQue.begin());
+    else 
+        return UNKNOWN_ERROR;
     if (mMsg == nullptr) {
         LOGE("Message not found - Fix the bug");
         return UNKNOWN_ERROR;
@@ -214,7 +225,6 @@ status_t OutputFrameWorker::run()
         LOG1("No work for this worker");
         return OK;
     }
-
     // If output format is something else than
     // NV21 or Android flexible YCbCr 4:2:0, return
     if (mOutputBuffer->format() != HAL_PIXEL_FORMAT_YCrCb_420_SP &&
@@ -228,16 +238,18 @@ status_t OutputFrameWorker::run()
     V4L2BufferInfo outBuf;
 
     status = mNode->grabFrame(&outBuf);
-    if (mNodeName == IMGU_NODE_VIDEO) {
-        ICaptureEventListener::CaptureMessage outMsg;
-        Camera3Request* request = mMsg->cbMetadataMsg.request;
-        outMsg.data.event.reqId = request->getId();
-        outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
-        outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
-        outMsg.data.event.timestamp = outBuf.vbuffer.timestamp();
-        outMsg.data.event.sequence = outBuf.vbuffer.sequence();
-        notifyListeners(&outMsg);
-    }
+
+    LOG2("%s:%d: buffer frame_id(%d)", __func__, __LINE__, outBuf.vbuffer.sequence());
+
+    ICaptureEventListener::CaptureMessage outMsg;
+    Camera3Request* request = mMsg->cbMetadataMsg.request;
+    outMsg.data.event.reqId = request->getId();
+    outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
+    outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
+    outMsg.data.event.timestamp = outBuf.vbuffer.timestamp();
+    outMsg.data.event.sequence = outBuf.vbuffer.sequence();
+    notifyListeners(&outMsg);
+
     return (status < 0) ? status : OK;
 }
 
@@ -248,6 +260,10 @@ status_t OutputFrameWorker::postRun()
     status_t status = OK;
     CameraStream *stream;
     Camera3Request* request = nullptr;
+    std::shared_ptr<DeviceMessage> mMsg;
+    if (mMsgQue.empty())
+        return OK;
+    mMsg = *(mMsgQue.begin());
 
     if (mMsg == nullptr) {
         LOGE("Message null - Fix the bug");
@@ -330,13 +346,15 @@ status_t OutputFrameWorker::postRun()
     }
 
     // call capturedone for the stream of the buffer
+
+    mOutputBufferQue.erase(mOutputBufferQue.begin());
+    LOG2("%s:%d: %d buffers still in driver", __func__, __LINE__, mOutputBufferQue.size());
     stream->captureDone(mOutputBuffer, request);
 
 exit:
     /* Prevent from using old data */
-    mMsg = nullptr;
     mOutputBuffer = nullptr;
-    mIndex = (mIndex + 1) % mPipelineDepth;
+    mMsgQue.erase(mMsgQue.begin());
 
     return status;
 }

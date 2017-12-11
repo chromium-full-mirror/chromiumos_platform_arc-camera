@@ -64,7 +64,8 @@ ControlUnit::ControlUnit(ImguUnit *thePU,
         mGainDelay(0),
         mLensSupported(false),
         mLensController(nullptr),
-        mSofSequence(0)
+        mSofSequence(0),
+        mShutterDoneReqId(-1)
 {
 }
 
@@ -377,7 +378,7 @@ void RequestCtrlState::init(Camera3Request *req,
     if (entry.count == 1) {
         intent = entry.data.u8[0];
     }
-
+    LOG2("%s:%d: request id(%lld), capture_intent(%d)", __func__, __LINE__, id, intent);
     ctrlUnitResult->update(ANDROID_CONTROL_CAPTURE_INTENT, entry.data.u8,
                                                            entry.count);
     entry = settings->find(ANDROID_CONTROL_MODE);
@@ -398,6 +399,7 @@ ControlUnit::~ControlUnit()
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
 
     mLatestStatistics = nullptr;
+    mLatestStatisticsQue.clear();
     mSettingsHistory.clear();
 
     requestExitAndWait();
@@ -437,9 +439,9 @@ ControlUnit::configStreamsDone(bool configChanged)
 
     if (configChanged) {
         mLatestRequestId = -1;
-        mPendingRequests.clear();
         mWaitingForCapture.clear();
         mSettingsHistory.clear();
+        mLatestStatisticsQue.clear();
         /*stop here? zyc*/
         mSyncManager->stop();
 
@@ -582,29 +584,18 @@ ControlUnit::handleNewRequest(Message &msg)
         LOGE("Could not process all settings, reporting request as invalid");
     }
 
-    mPendingRequests.push_back(reqState);
-    reqState = mPendingRequests[0];
+    if (!mLatestStatisticsQue.empty()) {
+        mLatestStatistics = *(mLatestStatisticsQue.begin());
+        mLatestStatisticsQue.erase(mLatestStatisticsQue.begin());
+    } else {
+        LOG2("%s:%d: No stats comming", __func__, __LINE__);
+    }
 
-    /**
-     * PHASE2: Process for capture or Q or reprocessing
-     * Use dummy stats if no stats is received.
-     *
-     * Use the latest valid stats for still capture,
-     * it comes from video pipe (during still preview)
-     */
-    if (mLatestRequestId >= AWB_CONVERGENCE_WAIT_COUNT ||
-        mLatestRequestId == -1 ||
-        reqState->request->getBufferCountOfFormat(HAL_PIXEL_FORMAT_BLOB) > 0 ||
-        (mLatestStatistics != nullptr &&
-         mLatestRequestId == mLatestStatistics->frame_id)) {
-      mPendingRequests.erase(mPendingRequests.begin());
-
-      status = processRequestForCapture(reqState, mLatestStatistics);
-      if (CC_UNLIKELY(status != OK)) {
+    status = processRequestForCapture(reqState, mLatestStatistics);
+    if (CC_UNLIKELY(status != OK)) {
         LOGE("Failed to process req %d for capture [%d]",
-             reqState->request->getId(), status);
+        reqState->request->getId(), status);
         // TODO: handle error !
-      }
     }
 
     return status;
@@ -796,6 +787,11 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
         mSyncManager->start();
     }
 
+    status = applyAeParams(reqState->captureSettings);
+    if (status != NO_ERROR) {
+        LOGE("Failed to apply AE settings for request %d", reqId);
+    }
+
     /*TODO, needn't this anymore ? zyc*/
     reqState->framesArrived++;
     status = completeProcessing(reqState);
@@ -819,35 +815,12 @@ ControlUnit::applyAeParams(std::shared_ptr<CaptureUnitSettings> &aiqCaptureSetti
 status_t
 ControlUnit::handleNewStat(Message &msg)
 {
-    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
     status_t status = NO_ERROR;
     std::shared_ptr<rk_aiq_statistics_input_params> stats = msg.stats;
     int statsId = 0;
     if (stats.get() != nullptr) {
         statsId = stats->frame_id;
-        mLatestStatistics = stats;
-    }
-
-    if (mPendingRequests.empty()) {
-        return status;
-    }
-
-    // Process request
-    std::shared_ptr<RequestCtrlState> reqState = mPendingRequests[0];
-    mPendingRequests.erase(mPendingRequests.begin());
-
-    if (CC_UNLIKELY(!reqState || reqState->request == nullptr)) {
-        LOGE("reqState is nullptr, find BUG!");
-        return UNKNOWN_ERROR;
-    }
-
-    LOG2("@%s: process reqState %d, with stat id of req %d", __FUNCTION__,
-            reqState->request->getId(), statsId);
-
-    status = processRequestForCapture(reqState, mLatestStatistics);
-    if (CC_UNLIKELY(status != OK)) {
-        LOGE("Failed to process request %d for capture ", reqState->request->getId());
-        // TODO: handle error !
+        mLatestStatisticsQue.push_back(stats);
     }
 
     return status;
@@ -935,6 +908,10 @@ ControlUnit::handleNewShutter(Message &msg)
     std::shared_ptr<RequestCtrlState> reqState = nullptr;
     int reqId = msg.data.shutter.requestId;
 
+    //check whether this reqId has been shutter done
+    if (reqId <= mShutterDoneReqId)
+        return OK;
+
     std::map<int, std::shared_ptr<RequestCtrlState>>::iterator it =
                                     mWaitingForCapture.find(reqId);
     if (it == mWaitingForCapture.end()) {
@@ -977,6 +954,7 @@ ControlUnit::handleNewShutter(Message &msg)
     reqState->request->mCallback->shutterDone(reqState->request, ts);
     reqState->shutterDone = true;
     reqState->captureSettings->timestamp = ts;
+    mShutterDoneReqId = reqId;
 
     return NO_ERROR;
 }
@@ -1010,7 +988,6 @@ ControlUnit::handleMessageFlush(void)
 
     mSyncManager->flush();
     mWaitingForCapture.clear();
-    mPendingRequests.clear();
     mSettingsHistory.clear();
 
     return NO_ERROR;

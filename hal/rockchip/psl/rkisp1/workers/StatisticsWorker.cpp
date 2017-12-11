@@ -28,10 +28,9 @@
 namespace android {
 namespace camera2 {
 
-const unsigned int STAT_WORK_BUFFERS = 3;
 
-StatisticsWorker::StatisticsWorker(std::shared_ptr<V4L2VideoNode> node, int cameraId):
-        FrameWorker(node, cameraId, STAT_WORK_BUFFERS, "StatisticsWorker")
+StatisticsWorker::StatisticsWorker(std::shared_ptr<V4L2VideoNode> node, int cameraId, size_t pipelineDepth) :
+        FrameWorker(node, cameraId, pipelineDepth, "StatisticsWorker")
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     mPollMe = true;
@@ -75,7 +74,7 @@ status_t StatisticsWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     status_t status = OK;
-    mMsg = msg;
+    mMsgQue.push_back(msg);
 
     status |= mNode->putFrame(mBuffers[mIndex]);
 
@@ -120,7 +119,7 @@ static void dumpHIST(struct cifisp_hist_stat& hist) {
 }
 
 static void dumpStats(struct rkisp1_stat_buffer* stats) {
-    LOG2("%s:%d: frame_id(%d), meas_type(%d)", __func__, __LINE__, stats->frame_id, stats->meas_type);
+    LOG2("%s:%d: frame id(%d), meas_type(%d)", __func__, __LINE__, stats->frame_id, stats->meas_type);
     dumpAE(stats->params.ae);
     dumpAWB(stats->params.awb);
     dumpAF(stats->params.af);
@@ -130,10 +129,12 @@ static void dumpStats(struct rkisp1_stat_buffer* stats) {
 status_t StatisticsWorker::run()
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-    if (!mMsg) {
-        LOGE("Message is not set - Fix the bug");
+    std::shared_ptr<DeviceMessage> mMsg;
+    if (mMsgQue.empty()) {
+        LOG2("%s:%d: No buffer queued before grabFrame, is a bug , fix me", __func__, __LINE__);
         return UNKNOWN_ERROR;
     }
+    mMsg = *(mMsgQue.begin());
 
     #define DUMP_INTERVAL 10
     status_t status = OK;
@@ -154,7 +155,7 @@ status_t StatisticsWorker::run()
         LOGE("Not enough memory to allocate stats");
         return NO_MEMORY;
     }
-    memset(stats.get(), 0, sizeof(rk_aiq_awb_measure_result));
+    memset(stats.get(), 0, sizeof(rk_aiq_statistics_input_params));
     dumpStats(isp_stats);
     status = mConvertor.convertStats(isp_stats, stats.get());
     if (status != OK) {
@@ -177,7 +178,9 @@ status_t StatisticsWorker::run()
 
 status_t StatisticsWorker::postRun()
 {
-    mMsg = nullptr;
+    if (mMsgQue.empty())
+        return UNKNOWN_ERROR;
+    mMsgQue.erase(mMsgQue.begin());
     return OK;
 }
 

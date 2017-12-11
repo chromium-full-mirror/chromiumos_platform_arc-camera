@@ -98,6 +98,7 @@ private:
     std::shared_ptr<CameraBuffer> getOutputBufferForListener();
 
 private:
+    std::vector<std::shared_ptr<CameraBuffer>> mOutputBufferQue;
     std::shared_ptr<CameraBuffer> mOutputBuffer;
     std::shared_ptr<CameraBuffer> mWorkingBuffer;
     camera3_stream_t* mStream; /* OutputFrameWorker doesn't own mStream */

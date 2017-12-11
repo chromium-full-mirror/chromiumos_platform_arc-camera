@@ -41,7 +41,7 @@ public:
     virtual status_t run() = 0;
     virtual status_t postRun() = 0;
     virtual bool needPolling() { return mPollMe; }
-    std::shared_ptr<V4L2VideoNode> getNode() const
+    virtual std::shared_ptr<V4L2VideoNode> getNode()
     {
         return mNode;
     }

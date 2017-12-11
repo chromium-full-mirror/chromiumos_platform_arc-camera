@@ -65,7 +65,7 @@ private:
 class ParameterWorker: public FrameWorker
 {
 public:
-    ParameterWorker(std::shared_ptr<V4L2VideoNode> node, const StreamConfig& activeStreams, int cameraId);
+    ParameterWorker(std::shared_ptr<V4L2VideoNode> node, const StreamConfig& activeStreams, int cameraId, size_t pipelineDepth);
     virtual ~ParameterWorker();
 
     virtual status_t configure(std::shared_ptr<GraphConfig> &config);
