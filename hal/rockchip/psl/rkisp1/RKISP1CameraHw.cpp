@@ -28,12 +28,12 @@
 #include "PlatformData.h"
 #include "ImguUnit.h"
 #include "ControlUnit.h"
-#include "CaptureUnit.h"
 #include "PSLConfParser.h"
 
 namespace android {
 namespace camera2 {
 
+static const uint8_t DEFAULT_PIPELINE_DEPTH = 4;
 #define CONFIGURE_LARGE_SIZE (1920*1080)
 
 // Camera factory
@@ -47,7 +47,6 @@ RKISP1CameraHw::RKISP1CameraHw(int cameraId):
         mPipelineDepth(-1),
         mImguUnit(nullptr),
         mControlUnit(nullptr),
-        mCaptureUnit(nullptr),
         mGCM(cameraId),
         mUseCase(USECASE_VIDEO),
         mOperationMode(0)
@@ -92,19 +91,12 @@ RKISP1CameraHw::init()
 
     mGCM.setMediaCtl(mMediaCtl);
 
-    mCaptureUnit = new CaptureUnit(mCameraId, mGCM, mMediaCtl);
-    status = mCaptureUnit->init();
-    if (status != NO_ERROR) {
-        LOGE("Error initializing CaptureUnit, ret code: %x", status);
-        return status;
-    }
-
     mImguUnit = new ImguUnit(mCameraId, mGCM, mImguMediaCtl);
 
     mControlUnit = new ControlUnit(mImguUnit,
-                                   mCaptureUnit,
                                    mCameraId,
-                                   mGCM);
+                                   mGCM,
+                                   mMediaCtl);
     status = mControlUnit->init();
     if (status != NO_ERROR) {
         LOGE("Error initializing ControlUnit. ret code:%x", status);
@@ -113,12 +105,6 @@ RKISP1CameraHw::init()
 
     // Register ControlUnit as a listener to capture events
     status = mImguUnit->attachListener(mControlUnit);
-    status |= mCaptureUnit->attachListener(mControlUnit);
-    if (status != NO_ERROR) {
-        LOGE("Error registering CaptureUnit listener");
-        return status;
-    }
-
     status = initStaticMetadata();
     if (status != NO_ERROR) {
         LOGE("Error call initStaticMetadata, status:%d", status);
@@ -137,11 +123,6 @@ RKISP1CameraHw::deInit()
        mImguUnit->flush();
     }
 
-    if (mCaptureUnit) {
-        mCaptureUnit->cleanListeners();
-        mCaptureUnit->flush();
-    }
-
     if (mControlUnit) {
         mControlUnit->flush();
         delete mControlUnit;
@@ -151,11 +132,6 @@ RKISP1CameraHw::deInit()
     if (mImguUnit) {
         delete mImguUnit;
         mImguUnit = nullptr;
-    }
-
-    if (mCaptureUnit) {
-        delete mCaptureUnit;
-        mCaptureUnit = nullptr;
     }
 
     if(mStaticMeta) {
@@ -318,7 +294,6 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
 
     /* Flush to make sure we return all graph config objects to the pool before
        next stream config. */
-    mCaptureUnit->flush();
     mImguUnit->flush();
     mControlUnit->flush();
 
@@ -336,12 +311,6 @@ RKISP1CameraHw::configStreams(std::vector<camera3_stream_t*> &activeStreams,
     status = mGCM.configStreams(configuredStreams, operation_mode);
     if (status != NO_ERROR) {
         LOGE("Unable to configure stream: No matching graph config found! BUG");
-        return status;
-    }
-
-    status = mCaptureUnit->configStreams(configuredStreams, configChanged);
-    if (status != NO_ERROR) {
-        LOGE("Unable to configure stream");
         return status;
     }
 
@@ -426,19 +395,12 @@ status_t RKISP1CameraHw::reconfigureStreams(UseCase newUseCase, uint32_t operati
 
     /* Flush to make sure we return all graph config objects to the pool before
        next stream config. */
-    mCaptureUnit->flush();
     mImguUnit->flush();
     mControlUnit->flush();
 
     status_t status = mGCM.configStreams(streams, operation_mode);
     if (status != NO_ERROR) {
         LOGE("Unable to configure stream: No matching graph config found! BUG");
-        return status;
-    }
-
-    status = mCaptureUnit->configStreams(streams, true);
-    if (status != NO_ERROR) {
-        LOGE("Unable to configure stream");
         return status;
     }
 

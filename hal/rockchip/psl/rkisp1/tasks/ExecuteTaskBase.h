@@ -24,7 +24,6 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "CaptureBuffer.h"
 #include "Camera3Request.h"
 #include "CameraStream.h"
 #include "MessageQueue.h"
@@ -56,12 +55,10 @@ struct StreamConfig {
 struct ProcTaskMsg {
     bool immediate;
     unsigned int reqId;
-    std::shared_ptr<CaptureBuffer> rawNonScaledBuffer;
-    CaptureBuffer *statsCapture;
     std::shared_ptr<ProcUnitSettings> processingSettings;
 
     // Default constructor:
-    ProcTaskMsg() : immediate(false), reqId(0), statsCapture(nullptr) {}
+    ProcTaskMsg() : immediate(false), reqId(0){}
 };
 
 /**

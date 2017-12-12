@@ -24,7 +24,6 @@
 #include "ImguUnit.h"
 #include "LogHelper.h"
 #include "PerformanceTraces.h"
-#include "workers/InputFrameWorker.h"
 #include "workers/OutputFrameWorker.h"
 #include "workers/StatisticsWorker.h"
 #include "CameraMetadataHelper.h"
@@ -286,6 +285,12 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
     //HACK: rk has only vido config, set it as default,zyc
     mCurPipeConfig = &mPipeConfigs[PIPE_VIDEO_INDEX];
 
+    status = mMediaCtlHelper.configure(mGCM, IStreamConfigProvider::CIO2);
+    if (status != OK) {
+        LOGE("Failed to configure input system.");
+        return status;
+    }
+
     status = mMediaCtlHelper.configure(mGCM, IStreamConfigProvider::IMGU_COMMON);
     if (status != OK)
         return UNKNOWN_ERROR;
@@ -326,13 +331,7 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
     size_t pipelineDepth = entry.count == 1 ? entry.data.u8[0] : 1;
     for (const auto &it : mConfiguredNodesPerName) {
         std::shared_ptr<FrameWorker> worker = nullptr;
-        if (it.first == IMGU_NODE_INPUT) {
-            worker = std::make_shared<InputFrameWorker>(it.second, mCameraId, pipelineDepth);
-            videoConfig->deviceWorkers.push_back(worker); // Input frame;
-            videoConfig->pollableWorkers.push_back(worker);
-            videoConfig->nodes.push_back(worker->getNode()); // Nodes are added for pollthread init
-            mFirstWorkers.push_back(worker);
-        } else if (it.first == IMGU_NODE_STAT) {
+        if (it.first == IMGU_NODE_STAT) {
             std::shared_ptr<StatisticsWorker> statWorker =
                 std::make_shared<StatisticsWorker>(it.second, mCameraId);
             mListenerDeviceWorkers.push_back(statWorker.get());
@@ -464,7 +463,6 @@ status_t ImguUnit::attachListener(ICaptureEventListener *aListener)
 
 status_t
 ImguUnit::completeRequest(std::shared_ptr<ProcUnitSettings> &processingSettings,
-                          ICaptureEventListener::CaptureBuffers &captureBufs,
                           bool updateMeta)
 {
         HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
@@ -480,13 +478,7 @@ ImguUnit::completeRequest(std::shared_ptr<ProcUnitSettings> &processingSettings,
         LOG2("@%s: Req id %d,  Num outbufs %zu Num inbufs %zu",
              __FUNCTION__, reqId, outBufs ? outBufs->size() : 0, inBufs ? inBufs->size() : 0);
 
-        if (captureBufs.rawNonScaledBuffer.get() != nullptr) {
-            LOG2("Using Non Scaled Buffer %p for req id %d",
-                 reinterpret_cast<void*>(captureBufs.rawNonScaledBuffer->buf->data()), reqId);
-        }
-
         ProcTaskMsg procMsg;
-        procMsg.rawNonScaledBuffer = captureBufs.rawNonScaledBuffer;
         procMsg.reqId = reqId;
         procMsg.processingSettings = processingSettings;
 
@@ -559,15 +551,8 @@ status_t ImguUnit::processNextRequest()
         status |= lTask->settings(msg->pMsg);
     }
 
-    if (msg->cbMetadataMsg.updateMeta) {
+    if (msg->cbMetadataMsg.updateMeta)
         updateProcUnitResults(*request, msg->pMsg.processingSettings);
-
-        #ifndef USED_FAKE_INPUTSYS
-        //return the metadata
-        //not return here for non isys, zyc, returned after fram grabbed, zyc
-        request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
-        #endif
-    }
 
     mMessagesUnderwork.push_back(msg);
 
@@ -736,17 +721,15 @@ ImguUnit::startProcessing()
         status |= (*it)->run();
     }
 
-#ifdef USED_FAKE_INPUTSYS
-    //return control result here, zyc.
-    std::shared_ptr<DeviceMessage> msg = *(mMessagesUnderwork.begin());
-    Camera3Request *request = msg->cbMetadataMsg.request;
-    request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
-#endif
-
     it = mCurPipeConfig->deviceWorkers.begin();
     for (;it != mCurPipeConfig->deviceWorkers.end(); ++it) {
         status |= (*it)->postRun();
     }
+
+    //HACK: return metadata after updated it
+    std::shared_ptr<DeviceMessage> msg = *(mMessagesUnderwork.begin());
+    Camera3Request *request = msg->cbMetadataMsg.request;
+    request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
 
     mMessagesUnderwork.erase(mMessagesUnderwork.begin());
 

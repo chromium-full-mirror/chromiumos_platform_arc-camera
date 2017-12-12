@@ -22,15 +22,14 @@
 #define CAMERA3_HAL_CONTROLUNIT_H_
 #include <memory>
 #include <vector>
+#include <linux/rkisp1-config.h>
 #include "MessageQueue.h"
 #include "MessageThread.h"
 #include "ImguUnit.h"
-#include "CaptureUnit.h"
 #include "SharedItemPool.h"
-#include "CaptureBuffer.h"
 #include "CaptureUnitSettings.h"
 #include "RequestCtrlState.h"
-#include <linux/rkisp1-config.h>
+#include "SyncManager.h"
 #include "Rk3aRunner.h"
 
 namespace android {
@@ -56,9 +55,9 @@ class ControlUnit : public IMessageHandler, public ICaptureEventListener
 {
 public:
     explicit ControlUnit(ImguUnit *thePU,
-                         CaptureUnit *theCU,
                          int CameraId,
-                         IStreamConfigProvider &aStreamCfgProv);
+                         IStreamConfigProvider &aStreamCfgProv,
+                         std::shared_ptr<MediaController> mc);
     virtual ~ControlUnit();
 
     status_t init();
@@ -77,7 +76,6 @@ public:  /* private types */
     enum MessageId {
         MESSAGE_ID_EXIT = 0,
         MESSAGE_ID_NEW_REQUEST,
-        MESSAGE_ID_NEW_IMAGE,
         MESSAGE_ID_NEW_AF_STAT,
         MESSAGE_ID_NEW_2A_STAT,
         MESSAGE_ID_NEW_SENSOR_METADATA,
@@ -125,8 +123,6 @@ public:  /* private types */
         Camera3Request* request;
         std::shared_ptr<RequestCtrlState> state;
         std::shared_ptr<rk_aiq_statistics_input_params> stats;
-        std::shared_ptr<CaptureBuffer> rawBuffer;
-        std::shared_ptr<CaptureBuffer> yuvBuffer;
         CaptureEventType type;
         Message(): id(MESSAGE_ID_EXIT),
             requestId(0),
@@ -155,7 +151,6 @@ private:  /* Methods */
 
     status_t handleMessageExit();
     status_t handleNewRequest(Message &msg);
-    status_t handleNewImage(Message &msg);
     status_t handleNewStat(Message &msg);
     status_t handleNewSensorDescriptor(Message &msg);
     status_t handleNewSof(Message &msg);
@@ -171,6 +166,9 @@ private:  /* Methods */
     status_t allocateLscResults();
     status_t acquireRequestStateStruct(std::shared_ptr<RequestCtrlState>& state);
     std::shared_ptr<CaptureUnitSettings> findSettingsInEffect(uint64_t expId);
+    status_t getSensorModeData(rk_aiq_exposure_sensor_descriptor &desc);
+    status_t initStaticMetadata();
+    status_t applyAeParams(std::shared_ptr<CaptureUnitSettings> &aiqCaptureSettings);
 
 private:  /* Members */
     SharedItemPool<RequestCtrlState> mRequestStatePool;
@@ -183,9 +181,10 @@ private:  /* Members */
     int64_t mLatestRequestId;
 
     ImguUnit       *mImguUnit; /* ControlUnit doesn't own ImguUnit */
-    CaptureUnit    *mCaptureUnit; /* ControlUnit doesn't own mCaptureUnit */
     Rk3aPlus    *m3aWrapper;
     int             mCameraId;
+
+    std::shared_ptr<MediaController>             mMediaCtl;
 
     /**
      * Thread control members
@@ -208,7 +207,11 @@ private:  /* Members */
     Metadata *mMetadata;
 
     Rk3aRunner *m3ARunner;
-    LensHw *mLensController;
+    int mSensorSettingsDelay;
+    int mGainDelay;
+    bool mLensSupported;
+    std::shared_ptr<LensHw> mLensController;
+    std::shared_ptr<SyncManager>    mSyncManager;
 
     rk_aiq_exposure_sensor_descriptor mSensorDescriptor;
 

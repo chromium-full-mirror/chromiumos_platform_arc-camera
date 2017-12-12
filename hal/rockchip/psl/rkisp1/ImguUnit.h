@@ -50,7 +50,6 @@ public:
     status_t configStreams(std::vector<camera3_stream_t*> &activeStreams);
     void cleanListener();
     status_t completeRequest(std::shared_ptr<ProcUnitSettings> &processingSettings,
-                             ICaptureEventListener::CaptureBuffers &captureBufs,
                              bool updateMeta);
 
     status_t attachListener(ICaptureEventListener *aListener);
