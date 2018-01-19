@@ -23,6 +23,7 @@
 
 #include <hardware/camera3.h>
 
+#include "CameraConf.h"
 #include "PlatformData.h"
 #include "RequestThread.h"
 

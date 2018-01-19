@@ -32,15 +32,22 @@ Rk3aAiq::~Rk3aAiq()
     LOG1("@%s", __FUNCTION__);
 }
 
-bool Rk3aAiq::init(const ia_binary_data* nvm_data,
+bool Rk3aAiq::init(const ia_binary_data* aiqb_data,
+            const ia_binary_data* nvm_data,
+            const ia_binary_data* aiqd_data,
             unsigned int stats_max_width,
             unsigned int stats_max_height,
-            unsigned int max_num_stats_in)
+            unsigned int max_num_stats_in,
+            uintptr_t cmc_handle,
+            uintptr_t mkn_handle)
 {
     LOG1("@%s", __FUNCTION__);
 
-    mAiq = rk_aiq_init(nvm_data, stats_max_width,
-                        stats_max_height, max_num_stats_in);
+    ia_cmc_t* cmc = reinterpret_cast<ia_cmc_t*>(cmc_handle);
+    ia_mkn* mkn = reinterpret_cast<ia_mkn*>(mkn_handle);
+
+    mAiq = rk_aiq_init(aiqb_data, nvm_data, aiqd_data, stats_max_width,
+                        stats_max_height, max_num_stats_in, cmc, mkn);
     CheckError(mAiq == nullptr, false, "@%s, rk_aiq_init fails", __FUNCTION__);
 
     return true;

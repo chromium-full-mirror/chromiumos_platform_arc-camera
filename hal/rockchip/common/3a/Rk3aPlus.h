@@ -68,6 +68,7 @@ public:
     /*
      * static common operation
      */
+    static float calculateHyperfocalDistance(ia_cmc_t &cmc);
     static status_t reFormatLensShadingMap(const LSCGrid &inputLscGrid,
                                            float *dstLscGridRGGB);
     static status_t storeLensShadingMap(const LSCGrid &inputLscGrid,
@@ -84,7 +85,11 @@ public:
     static status_t deepCopySAResults(rk_aiq_sa_results *dst, const rk_aiq_sa_results *src);
 
     float getMinFocusDistance() const { return mMinFocusDistance; }
-
+    /* map ISO */
+    void setSupportIsoMap(bool support);
+    void initIsoMappingRatio(void);
+    int32_t mapUiIso2RealIso(int32_t iso);
+    int32_t mapRealIso2UiIso(int32_t iso);
     char mapUiImageEnhancement2Aiq(int uiValue);
 
 private:
@@ -112,6 +117,8 @@ private:
 private:
     int mCameraId;
 
+    Rk3aExc mExc;
+
     /**
      * Cached values from static metadata
      */
@@ -125,6 +132,8 @@ private:
     int64_t mMinExposureTime;
     int64_t mMaxExposureTime;
     int64_t mMaxFrameDuration;
+    double mPseudoIsoRatio;
+    bool mSupportIsoMap;
 }; //  class Rk3aPlus
 } NAMESPACE_DECLARATION_END
 

@@ -58,6 +58,8 @@ private:
     int mCameraId;
     rk_aiq_exposure_sensor_descriptor mSensorDescriptor;
     static constexpr float ONE_PERCENT = 0.01f;
+    Rk3aPlus *m3aWrapper; /* Metadata doesn't own m3aWrapper */
+    static const int32_t DELTA_ISO = 1;
 };
 } /* namespace camera2 */
 } /* namespace android */

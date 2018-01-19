@@ -51,7 +51,7 @@
  * - \ref deinit
  *
  * Some AIQ algorithms require coordinates as inputs to specify a certain area in the image. Coordinates are relative to
- * the statistics thus not necessarily the whole sensor area.
+ * the statistics thus not necessarily the whole sensor area. Coordinates are not absolute but relative. See \link ia_coordinate.h \endlink
  * for detailed description of the used coordinate system.
  * <br><hr><br>
  *
@@ -162,6 +162,8 @@
 
 #include "rk_aiq_types.h"
 #include "ia_types.h"
+#include "ia_mkn_types.h"
+#include "ia_cmc_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -193,13 +195,24 @@ extern "C" {
  * \param[in]     max_num_stats_in  Mandatory.\n
  *                                  The maximum number of input statistics for one frame. Each statistics is related to different exposure.
  *                                  Used especially for sensors that support two or more simultaneous exposures (HDR).
+ * \param[in]     ia_cmc            Mandatory.\n
+ *                                  Parsed camera module characterization structure. ia_cmc structure needs to be kept available by client for
+ *                                  the lifetime of AIQ component.
+ * \param[in,out] ia_mkn            Optional.\n
+ *                                  Makernote handle which can be initialized with ia_mkn library. If debug data from AIQ is needed
+ *                                  to be stored into EXIF, this parameter is needed. Algorithms will update records inside this makernote instance.
+ *                                  Client writes the data into Makernote section in EXIF.
  * return                           IA_AIQ handle. Use the returned handle as input parameter for the consequent IA_AIQ calls.
  */
 LIBEXPORT rk_aiq*
-rk_aiq_init(const ia_binary_data *nvm_data,
+rk_aiq_init(const ia_binary_data *aiqb_data,
+            const ia_binary_data *nvm_data,
+            const ia_binary_data *aiqd_data,
             unsigned int stats_max_width,
             unsigned int stats_max_height,
-            unsigned int max_num_stats_in);
+            unsigned int max_num_stats_in,
+            ia_cmc_t *ia_cmc,
+            ia_mkn *ia_mkn);
 
 /*!
  * \brief Set tuning to an existing AIQ instance.

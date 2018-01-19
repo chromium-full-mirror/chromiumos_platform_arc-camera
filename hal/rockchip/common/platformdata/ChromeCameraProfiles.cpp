@@ -19,7 +19,6 @@
 
 #include <string>
 #include <sstream>
-#include <sys/stat.h>
 #include <vector>
 #include <expat.h>
 #include "Utils.h"

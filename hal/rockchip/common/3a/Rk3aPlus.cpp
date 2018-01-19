@@ -24,6 +24,7 @@
 
 #include <utils/Errors.h>
 #include <math.h>
+#include <ia_exc.h>
 #include <limits.h> // SCHAR_MAX, SCHAR_MIN, INT_MAX
 
 #include "PlatformData.h"
@@ -32,6 +33,7 @@
 #include "Utils.h"
 
 NAMESPACE_DECLARATION {
+const float EPSILON = 0.00001f;
 
 
 Rk3aPlus::Rk3aPlus(int camId):
@@ -44,7 +46,9 @@ Rk3aPlus::Rk3aPlus(int camId):
         mMaxSensitivity(0),
         mMinExposureTime(0),
         mMaxExposureTime(0),
-        mMaxFrameDuration(0)
+        mMaxFrameDuration(0),
+        mPseudoIsoRatio(1.0),
+        mSupportIsoMap(false)
 {
     LOG1("@%s", __FUNCTION__);
 }
@@ -130,6 +134,137 @@ status_t Rk3aPlus::initAIQ(int maxGridW,
     }
 
     return status;
+}
+
+/**
+ * setSupportIsoMap
+ * Called with value true if iso mapping shall be used
+ */
+void Rk3aPlus::setSupportIsoMap(bool support)
+{
+    mSupportIsoMap = support;
+
+    if (mSupportIsoMap)
+        initIsoMappingRatio();
+}
+
+/**
+ * init mPseudoIsoRatio
+ * mPseudoIsoRatio is used for mapping between UI ISO and real ISO
+ * mPseudoIsoRatio = (maxSensitivity - mMinSensitivity) / (maxIso - baseISO);
+ * the mapping method is
+ * (UI ISO - mMinSensitivity) / (real ISO -baseISO)
+ * = (maxSensitivity - mMinSensitivity) / (maxIso - baseISO);
+ */
+void Rk3aPlus::initIsoMappingRatio()
+{
+    if (mSupportIsoMap == false)
+        return;
+
+    const ia_cmc_t* cmc = getCmc();
+    CheckError(cmc == nullptr, VOID_VALUE, "@%s, cmc is nullptr", __FUNCTION__);
+    CheckError(cmc->cmc_sensitivity == nullptr, VOID_VALUE, "@%s, cmc_sensitivity is nullptr", __FUNCTION__);
+
+    /* Get base/module ISO */
+    int32_t baseIso = cmc->cmc_sensitivity->base_iso;
+
+    /* Get the max analog sensitivity */
+    double maxAnalogIso = 0;
+    if (cmc->cmc_parsed_analog_gain_conversion.cmc_analog_gain_conversion != nullptr) {
+        float maxAnalogGain = 0.0;
+        unsigned short analogGainCode = 0;
+        mExc.AnalogGainToSensorUnits(&(cmc->cmc_parsed_analog_gain_conversion),
+                                           1000, &analogGainCode);
+        mExc.SensorUnitsToAnalogGain(&(cmc->cmc_parsed_analog_gain_conversion),
+                                           analogGainCode,
+                                           &maxAnalogGain);
+        // caclulate the iso base on max analog gain
+        maxAnalogIso = maxAnalogGain * baseIso;
+    }
+
+    /* Get the max digital gain */
+    double maxDigitalGain = 1.0;
+    if (cmc->cmc_parsed_digital_gain.cmc_digital_gain != nullptr) {
+        int fractionBits =
+            cmc->cmc_parsed_digital_gain.cmc_digital_gain->digital_gain_fraction_bits;
+        maxDigitalGain =
+            cmc->cmc_parsed_digital_gain.cmc_digital_gain->digital_gain_max / pow(2, fractionBits);
+    }
+
+    double maxIso = maxAnalogIso * maxDigitalGain;
+    if (maxIso - baseIso > EPSILON) {
+        mPseudoIsoRatio = ((double)(mMaxSensitivity - mMinSensitivity)) / (maxIso - baseIso);
+    } else {
+        LOGE("Max ISO is not greater than base ISO, configuration error!");
+        mSupportIsoMap = false;  // Disable ISO map mode.
+    }
+
+    LOG2("%s: maxAnalogIso: %lf, maxDigitalGain: %lf, baseIso: %d, mPseudoIsoRatio: %lf",
+         __FUNCTION__, maxAnalogIso, maxDigitalGain, baseIso, mPseudoIsoRatio);
+}
+
+/**
+ * get the real ISO AIQ supported
+ * mapping as following
+ * (UI ISO - mMinSensitivity) /(real ISO -baseISO)
+ * = (maxSensitivity - mMinSensitivity) / (maxIso - baseISO)
+ * = mPseudoIsoRatio
+ * so real ISO = (UI ISO - mMinSensitivity)/mPseudoIsoRatio + baseISO;
+ */
+int32_t Rk3aPlus::mapUiIso2RealIso (int32_t iso)
+{
+    if (mSupportIsoMap == false)
+        return iso;
+
+    CheckError(fabs(mPseudoIsoRatio) < EPSILON, iso, "@%s, mPseudoIsoRatio < EPSILON", __FUNCTION__);
+
+    const ia_cmc_t* cmc = getCmc();
+    CheckError(cmc == nullptr, iso, "@%s, cmc is nullptr", __FUNCTION__);
+    CheckError(cmc->cmc_sensitivity == nullptr, iso, "@%s, cmc_sensitivity is nullptr", __FUNCTION__);
+
+    int baseIso = cmc->cmc_sensitivity->base_iso;
+    if (iso < mMinSensitivity) {
+        LOGW("Limiting UI ISO. Should be larger than %d", mMinSensitivity);
+        return baseIso;
+    }
+    int rIso = round((iso - mMinSensitivity) / mPseudoIsoRatio);
+    rIso += baseIso;  // Make sure this is a pure int addition.
+
+    LOG2("%s: iso: %d real iso: %d", __FUNCTION__, iso, rIso);
+
+    return rIso;
+}
+
+/**
+ * get the UI ISO that mapped to real ISO
+ * mapping as following
+ * (UI ISO - mMinSensitivity) /(real ISO -base ISO)
+ * = (maxSensitivity - mMinSensitivity) / (maxIso - baseISO)
+ * = mPseudoIsoRatio
+ * so UI ISO = (real ISO -base ISO) * mPseudoIsoRatio + mMinSensitivity;
+ */
+int32_t Rk3aPlus::mapRealIso2UiIso (int32_t iso)
+{
+    if (mSupportIsoMap == false)
+        return iso;
+
+    CheckError(fabs(mPseudoIsoRatio) < EPSILON, iso, "@%s, mPseudoIsoRatio < EPSILON", __FUNCTION__);
+
+    const ia_cmc_t* cmc = getCmc();
+    CheckError(cmc == nullptr, iso, "@%s, cmc is nullptr", __FUNCTION__);
+    CheckError(cmc->cmc_sensitivity == nullptr, iso, "@%s, cmc_sensitivity is nullptr", __FUNCTION__);
+
+    int baseIso = cmc->cmc_sensitivity->base_iso;
+    if (iso < baseIso) {
+        LOGW("Limiting real ISO. Should be larger than %d", baseIso);
+        return mMinSensitivity;
+    }
+    int uiIso = round((iso - baseIso) * mPseudoIsoRatio);
+    uiIso += mMinSensitivity;  // Make sure this is a pure int addition.
+
+    LOG2("%s: iso:%d UI iso:%d", __FUNCTION__, iso, uiIso);
+
+    return uiIso;
 }
 
 /**
@@ -356,6 +491,22 @@ status_t Rk3aPlus::fillAeInputParams(const CameraMetadata *settings,
 
     CameraWindow *aeRegion = aeInputParams.aeRegion;
     CameraWindow *croppingRegion = aeInputParams.croppingRegion;
+    // ******** exposure_window
+    //# METADATA_Control control.aeRegions done
+    parseMeteringRegion(settings,ANDROID_CONTROL_AE_REGIONS, *aeRegion);
+    if (aeRegion->isValid()) {
+        CameraWindow dst;
+        // Clip the region to the crop rectangle
+        if (croppingRegion->isValid())
+            aeRegion->clip(*croppingRegion);
+        convertFromAndroidToIaCoordinates(*aeRegion, dst);
+
+        aiqInputParams->aeInputParams.exposure_window->left = dst.left();
+        aiqInputParams->aeInputParams.exposure_window->top = dst.top();
+        aiqInputParams->aeInputParams.exposure_window->right = dst.right();
+        aiqInputParams->aeInputParams.exposure_window->bottom = dst.bottom();
+    }
+
     // ******** exposure_coordinate
     // TODO: set when needed
     aiqInputParams->aeInputParams.exposure_coordinate = nullptr;
@@ -428,6 +579,7 @@ status_t Rk3aPlus::fillAeInputParams(const CameraMetadata *settings,
         if (entry.count == 1) {
             int32_t iso = entry.data.i32[0];
             if (iso >= mMinSensitivity && iso <= mMaxSensitivity) {
+                aiqInputParams->aeInputParams.manual_iso[0] = mapUiIso2RealIso(iso);
                 aiqInputParams->aeInputParams.manual_limits->
                     manual_iso_min = aiqInputParams->aeInputParams.manual_iso[0];
                 aiqInputParams->aeInputParams.manual_limits->
@@ -982,6 +1134,34 @@ Rk3aPlus::parseFocusDistance(const CameraMetadata &settings,
     afCfg.manual_focus_parameters->manual_focus_distance = focusInMm;
 
     return status;
+}
+
+/**
+ *  Hyperfocal distance is the closest distance at which a lens can be focused
+ *  while keeping objects at infinity acceptably sharp. When the lens is focused
+ *  at this distance, all objects at distances from half of the hyperfocal
+ *  distance out to infinity will be acceptably sharp.
+ *
+ *  The equation used for this is:
+ *        f*f
+ *  H = -------
+ *        N*c
+ *
+ *  where:
+ *   f is the focal length
+ *   N is the f-number (f/D for aperture diameter D)
+ *   c is the Circle Of Confusion (COC)
+ *
+ *   the COC is calculated as the pixel width of 2 pixels
+ *
+ * \param[in] cmc: reference to a valid Camera Module Characterization structure
+ * \returns the hyperfocal distance in mm. It is ensured it will never be 0 to
+ *          avoid division by 0. If any of the required CMC items is missing
+ *          it will return the default value 5m
+ */
+float Rk3aPlus::calculateHyperfocalDistance(ia_cmc_t &cmc)
+{
+    return Rk3aCore::calculateHyperfocalDistance(cmc);
 }
 
 /***** Deep Copy Functions ******/

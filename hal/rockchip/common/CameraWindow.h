@@ -20,7 +20,7 @@
 
 #include <utils/Errors.h>
 #include <stdint.h>
-#include "ia_types.h"
+#include "ia_coordinate.h"
 #include "FrameInfo.h"
 
 NAMESPACE_DECLARATION {

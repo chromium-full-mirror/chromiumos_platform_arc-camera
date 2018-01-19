@@ -25,7 +25,10 @@
 #include <utils/Errors.h>
 #include <math.h>
 #include <limits.h> // SCHAR_MAX, SCHAR_MIN
+#include <ia_cmc_parser.h>
+#include <ia_exc.h>
 #include <ia_log.h>
+#include <ia_mkn_encoder.h>
 
 #include "PlatformData.h"
 #include "LogHelper.h"
@@ -203,7 +206,9 @@ AiqResults &AiqResults::operator=(const AiqResults& other)
 }
 
 Rk3aCore::Rk3aCore(int camId):
+        mCmc(nullptr),
         mCameraId(camId),
+        mHyperFocalDistance(2.5f),
         mEnableAiqdDataSave(false)
 {
     LOG1("@%s, mCameraId:%d", __FUNCTION__, mCameraId);
@@ -218,13 +223,54 @@ status_t Rk3aCore::init(int maxGridW,
     LOG1("@%s", __FUNCTION__);
 
     status_t status = NO_ERROR;
-    bool ret = mAiq.init(&nvmData,
-                         maxGridW,
-                         maxGridH,
-                         NUM_EXPOSURES);
+    ia_err iaErr = ia_err_none;
+    ia_binary_data cpfData;
+    const AiqConf* aiqConf = PlatformData::getAiqConfiguration(mCameraId);
+    if (CC_UNLIKELY(aiqConf == nullptr)) {
+        LOGE("CPF file was not initialized ");
+        return NO_INIT;
+    }
+    cpfData.data = aiqConf->ptr();
+    cpfData.size = aiqConf->size();
+
+    bool ret = mMkn.init(ia_mkn_cfg_compression,
+                       MAKERNOTE_SECTION1_SIZE,
+                       MAKERNOTE_SECTION2_SIZE);
+    CheckError(ret == false, UNKNOWN_ERROR, "@%s, Error in initing makernote", __FUNCTION__);
+
+    iaErr = mMkn.enable(true);
+    if (iaErr != ia_err_none) {
+        status = convertError(iaErr);
+        LOGE("Error in enabling makernote: %d", status);
+    }
+
+    mCmc = aiqConf->getCMC();
+    CheckError(mCmc == nullptr, NO_INIT,
+        "@%s, call getCMC() fails, not initialized", __FUNCTION__);
+
+    ia_binary_data aiqdData;
+    CLEAR(aiqdData);
+    const ia_binary_data *pAiqdData = nullptr;
+
+    if (mEnableAiqdDataSave && sensorName != nullptr) {
+        /* fill in aiqd info to do 3A calculation */
+        if (PlatformData::readAiqdData(mCameraId, &aiqdData))
+            pAiqdData = &aiqdData;
+    }
+
+    ret = mAiq.init((ia_binary_data*)&(cpfData),
+                                &nvmData,
+                                pAiqdData,
+                                maxGridW,
+                                maxGridH,
+                                NUM_EXPOSURES,
+                                mCmc->getCmcHandle(),
+                                mMkn.getMknHandle());
     CheckError(ret == false, UNKNOWN_ERROR, "@%s, Error in IA AIQ init", __FUNCTION__);
 
     LOG1("@%s: AIQ version: %s.", __FUNCTION__, mAiq.getVersion());
+
+    mHyperFocalDistance = calculateHyperfocalDistance(*mCmc->getCmc());
     /**
      * Cache all the values we are going to need from the static metadata
      */
@@ -243,6 +289,9 @@ void Rk3aCore::deinit()
 
     if (mEnableAiqdDataSave)
         saveAiqdData();
+
+    mAiq.deinit();
+    mMkn.uninit();
 }
 
 /**
@@ -281,6 +330,68 @@ char Rk3aCore::mapUiImageEnhancement2Aiq(int uiValue)
     return (char)(SCHAR_MIN + step * (uiValue + UI_IMAGE_ENHANCEMENT_MAX));
 }
 
+void Rk3aCore::convertFromAndroidToIaCoordinates(const CameraWindow &srcWindow,
+                                                    CameraWindow &toWindow)
+{
+    const ia_coordinate_system iaCoord = {IA_COORDINATE_TOP, IA_COORDINATE_LEFT,
+                                          IA_COORDINATE_BOTTOM, IA_COORDINATE_RIGHT};
+    ia_coordinate_system androidCoord = {mActivePixelArray.top(),
+                                         mActivePixelArray.left(),
+                                         mActivePixelArray.bottom(),
+                                         mActivePixelArray.right()};
+    ia_coordinate topleft = {0, 0};
+    ia_coordinate bottomright = {0, 0};
+
+    topleft.x = srcWindow.left();
+    topleft.y = srcWindow.top();
+    bottomright.x = srcWindow.right();
+    bottomright.y = srcWindow.bottom();
+
+    topleft = mCoordinate.convert(androidCoord, iaCoord, topleft);
+    if (topleft.x < 0 || topleft.y < 0) {
+        LOGE("@%s, convert wrong, topleft: x:%d, y:%d", __FUNCTION__, topleft.x, topleft.y);
+        topleft = {srcWindow.left(), srcWindow.top()};
+    }
+    bottomright = mCoordinate.convert(androidCoord, iaCoord, bottomright);
+    if (bottomright.x < 0 || bottomright.y < 0) {
+        LOGE("@%s, convert wrong, bottomright: x:%d, y:%d", __FUNCTION__, bottomright.x, bottomright.y);
+        bottomright = {srcWindow.right(), srcWindow.bottom()};
+    }
+
+    toWindow.init(topleft, bottomright, srcWindow.weight());
+}
+
+void Rk3aCore::convertFromIaToAndroidCoordinates(const CameraWindow &srcWindow,
+                                                    CameraWindow &toWindow)
+{
+    const ia_coordinate_system iaCoord = {IA_COORDINATE_TOP, IA_COORDINATE_LEFT,
+                                          IA_COORDINATE_BOTTOM, IA_COORDINATE_RIGHT};
+    ia_coordinate_system androidCoord = {mActivePixelArray.top(),
+                                         mActivePixelArray.left(),
+                                         mActivePixelArray.bottom(),
+                                         mActivePixelArray.right()};
+    ia_coordinate topleft = {0, 0};
+    ia_coordinate bottomright = {0, 0};
+
+    topleft.x = srcWindow.left();
+    topleft.y = srcWindow.top();
+    bottomright.x = srcWindow.right();
+    bottomright.y = srcWindow.bottom();
+
+    topleft = mCoordinate.convert(iaCoord, androidCoord, topleft);
+    if (topleft.x < 0 || topleft.y < 0) {
+        LOGE("@%s, convert wrong, topleft.x:%d, topleft.y:%d", __FUNCTION__, topleft.x, topleft.y);
+        topleft = {srcWindow.left(), srcWindow.top()};
+    }
+    bottomright = mCoordinate.convert(iaCoord, androidCoord, bottomright);
+    if (bottomright.x < 0 || bottomright.y < 0) {
+        LOGE("@%s, convert wrong, bottomright.x:%d, bottomright.y:%d", __FUNCTION__, bottomright.x, bottomright.y);
+        bottomright = {srcWindow.right(), srcWindow.bottom()};
+    }
+
+    toWindow.init(topleft, bottomright, srcWindow.weight());
+}
+
 status_t Rk3aCore::setStatistics(rk_aiq_statistics_input_params *ispStatistics)
 {
     LOG2("@%s", __FUNCTION__);
@@ -312,12 +423,21 @@ status_t Rk3aCore::setStatistics(rk_aiq_statistics_input_params *ispStatistics)
  */
 status_t Rk3aCore::getMakerNote(ia_mkn_trg aTarget, ia_binary_data &aBlob)
 {
+    ia_binary_data mkn;
     if (aBlob.data == nullptr)
         return BAD_VALUE;
 
-    //TODO: fill makernote
-    memset(aBlob.data, 0, aBlob.size);
-    aBlob.size = 0;
+    mkn = mMkn.prepare(aTarget);
+
+    if (mkn.size > aBlob.size) {
+        LOGE(" Provided buffer is too small (%d) for maker note (%d)",
+                aBlob.size, mkn.size);
+        return BAD_VALUE;
+    }
+
+    MEMCPY_S(aBlob.data, aBlob.size, mkn.data, mkn.size);
+
+    aBlob.size = mkn.size;
     return OK;
 }
 
@@ -624,6 +744,129 @@ status_t Rk3aCore::runSa(rk_aiq_statistics_input_params *ispStatistics,
        LOGE("Error running SA %d",status);
     }
     return status;
+}
+
+/**
+ *
+ * Calculate the Depth of field (DOF) for a given AF Result.
+ *
+ * The Formulas to calculate the near and afar DOF are:
+ *          H * s
+ * Dn = ---------------
+ *         H + (s-f)
+ *
+ *          H * s
+ * Df =  ------------
+ *         H - (s-f)
+ *
+ * Where:
+ * H is the hyperfocal distance (that we get from CPF) (it cannot be 0)
+ * s is the distance to focused object (current focus distance)
+ * f is the focal length
+ *
+ * \param[in] afResults with current focus distance in mm
+ * \param[out] dofNear: DOF for near limit in mm
+ * \param[out] dofFar: DOF for far limit in mm
+ *
+ * \return OK
+ */
+status_t Rk3aCore::calculateDepthOfField(const rk_aiq_af_results &afResults,
+                                            float &dofNear, float &dofFar) const
+{
+    float focalLengthMillis = 2.3f;
+    float num = 0.0f;
+    float denom = 1.0f;
+    float focusDistance = 1.0f * afResults.current_focus_distance;
+    const float DEFAULT_DOF = 5000.0f;
+    dofNear = DEFAULT_DOF;
+    dofFar = DEFAULT_DOF;
+
+    cmc_optomechanics_t* optoInfo = nullptr;
+    if (getCmc()) {
+        optoInfo = getCmc()->cmc_parsed_optics.cmc_optomechanics;
+    }
+    if (CC_UNLIKELY(focusDistance == 0.0f)) {
+        // Not reporting error since this may be normal in fixed focus sensors
+        return OK;
+    }
+
+    if (optoInfo) {
+        // focal length is stored in CMC in hundreds of millimeters
+        focalLengthMillis = (float)optoInfo->effect_focal_length / 100;
+    }
+    num = mHyperFocalDistance * focusDistance;
+    denom = (mHyperFocalDistance + focusDistance - focalLengthMillis);
+    if (denom != 0.0f) {
+        dofNear = num / denom;
+    }
+
+    denom = (mHyperFocalDistance - focusDistance + focalLengthMillis);
+    if (denom != 0.0f) {
+        dofFar = num / denom;
+    }
+
+    return OK;
+}
+
+
+/**
+ *  Hyperfocal distance is the closest distance at which a lens can be focused
+ *  while keeping objects at infinity acceptably sharp. When the lens is focused
+ *  at this distance, all objects at distances from half of the hyperfocal
+ *  distance out to infinity will be acceptably sharp.
+ *
+ *  The equation used for this is:
+ *        f*f
+ *  H = -------
+ *        N*c
+ *
+ *  where:
+ *   f is the focal length
+ *   N is the f-number (f/D for aperture diameter D)
+ *   c is the Circle Of Confusion (COC)
+ *
+ *   the COC is calculated as the pixel width of 2 pixels
+ *
+ * \param[in] cmc: reference to a valid Camera Module Characterization structure
+ * \returns the hyperfocal distance in mm. It is ensured it will never be 0 to
+ *          avoid division by 0. If any of the required CMC items is missing
+ *          it will return the default value 5m
+ */
+float Rk3aCore::calculateHyperfocalDistance(ia_cmc_t &cmc)
+{
+    float hyperfocalDistanceMillis = 0;
+    float pixelSizeMicro = 100.0f; // size of pixels in um, default to avoid
+                                   // division by 0
+    float focalLengthMillis = 0.0f;
+    float fNumber = 0.0f;
+    const float DEFAULT_HYPERFOCAL_DISTANCE = 5000.0f;
+    const int CIRCLE_OF_CONFUSION_IN_PIXELS = 2;
+
+    cmc_optomechanics_t *optoInfo = cmc.cmc_parsed_optics.cmc_optomechanics;
+    if (optoInfo) {
+        // Pixel size is stored in CMC in hundreds of micrometers
+        pixelSizeMicro = optoInfo->sensor_pix_size_h / 100;
+        // focal length is stored in CMC in hundreds of millimeters
+        focalLengthMillis = (float)optoInfo->effect_focal_length / 100;
+    }
+    // fixed aperture, the fn should be divided 100 because the value
+    // is multiplied 100 in cmc
+    if (!cmc.cmc_parsed_optics.lut_apertures) {
+        LOGW("lut apertures is not provided in the cmc. Using default");
+        return DEFAULT_HYPERFOCAL_DISTANCE;
+    }
+
+    fNumber = (float)cmc.cmc_parsed_optics.lut_apertures[0] / 100;
+    if (fNumber == 0.0f)  // to avoid division by 0 later
+        return DEFAULT_HYPERFOCAL_DISTANCE;
+
+    // assuming square pixel
+    float cocMicros = pixelSizeMicro * CIRCLE_OF_CONFUSION_IN_PIXELS;
+
+    hyperfocalDistanceMillis = 1000 * (focalLengthMillis * focalLengthMillis) /
+                                      (fNumber * cocMicros);
+    return hyperfocalDistanceMillis != 0.0f ?
+           hyperfocalDistanceMillis : DEFAULT_HYPERFOCAL_DISTANCE;
 }
 
 /***** Deep Copy Functions ******/

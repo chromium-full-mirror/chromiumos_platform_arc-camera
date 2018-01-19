@@ -200,6 +200,15 @@ RkAFStateMachine::focusDistanceResult(const rk_aiq_af_results &afResults,
 
     //# METADATA_Dynamic lens.focusDistance Done
     result.update(ANDROID_LENS_FOCUS_DISTANCE, &afDistanceDiopters, 1);
+
+    float dof[2];
+    m3A.calculateDepthOfField(afResults, dof[0], dof[1]);
+    // Convert from mm to diopters (in place)
+    // dof is ensured not to be 0, check implementation of calculateDepthOfField
+    dof[0] = 1000.0f / dof[0];
+    dof[1] = 1000.0f / dof[1];
+    //# METADATA_Dynamic lens.focusRange Done
+    result.update(ANDROID_LENS_FOCUS_RANGE, dof, 2);
 }
 
 /******************************************************************************

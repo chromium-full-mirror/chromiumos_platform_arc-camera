@@ -22,16 +22,20 @@
 #define AAA_RK3ACORE_H_
 
 #include <rk_aiq.h>
+#include <ia_coordinate.h>
 #include <string>
 #include <utils/Errors.h>
 
-#include "3ATypes.h"
 #include "CameraWindow.h"
 #include "UtilityMacros.h"
 #include "Rk3aControls.h"
 #include "Rk3aHelper.h"
 
+#include "Rk3aCoordinate.h"
 #include "Rk3aAiq.h"
+#include "Rk3aCmc.h"
+#include "Rk3aExc.h"
+#include "Rk3aMkn.h"
 
 NAMESPACE_DECLARATION {
 static const unsigned int NUM_EXPOSURES = 1;   /*!> Number of frames AIQ algorithm
@@ -291,6 +295,14 @@ public:
 
     status_t getMakerNote(ia_mkn_trg aTarget, ia_binary_data &aBlob);
 
+    void convertFromAndroidToIaCoordinates(const CameraWindow &srcWindow,
+                                           CameraWindow &toWindow);
+    void convertFromIaToAndroidCoordinates(const CameraWindow &srcWindow,
+                                           CameraWindow &toWindow);
+
+    status_t calculateDepthOfField(const rk_aiq_af_results &afResults,
+                                   float &dofNear, float &dofFar) const;
+
     class LSCGrid {
     public: /* this was a struct: class just to satisfy a static code scanner */
         uint16_t width;
@@ -311,6 +323,7 @@ public:
     /*
      * static common operation
      */
+    static float calculateHyperfocalDistance(ia_cmc_t &cmc);
     static status_t reFormatLensShadingMap(const LSCGrid &inputLscGrid,
                                            float *dstLscGridRGGB);
     static status_t storeLensShadingMap(const LSCGrid &inputLscGrid,
@@ -328,6 +341,7 @@ public:
                                       const rk_aiq_sa_results *src,
                                       bool forceUpdated = false);
 
+    const ia_cmc_t* getCmc() const { return mCmc ? mCmc->getCmc() : nullptr; }
     char mapUiImageEnhancement2Aiq(int uiValue);
 
 private:
@@ -338,6 +352,9 @@ private:
 
     status_t convertError(ia_err iaErr);
 
+protected:
+    const Rk3aCmc* mCmc; /* CameraConf has ownership */
+
 // private members
 private:
     int mCameraId;
@@ -347,6 +364,8 @@ private:
 
 private:
     Rk3aAiq mAiq;
+    Rk3aMkn mMkn;
+    Rk3aCoordinate mCoordinate;
 }; //  class Rk3aCore
 
 } NAMESPACE_DECLARATION_END
