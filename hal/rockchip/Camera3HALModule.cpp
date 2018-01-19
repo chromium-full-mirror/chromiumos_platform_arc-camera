@@ -30,10 +30,6 @@
 
 #include "Camera3HAL.h"
 
-#ifdef REMOTE_3A_SERVER
-#include "Rk3aCommon.h"
-#endif
-
 using namespace android;
 USING_DECLARED_NAMESPACE;
 

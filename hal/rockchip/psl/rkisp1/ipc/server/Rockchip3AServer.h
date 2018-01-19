@@ -23,8 +23,14 @@
 
 #include <sys/un.h>
 
+#include "RKISP1ISPPipe.h"
 #include "IPCCommon.h"
+#include "AicLibrary.h"
 #include "AiqLibrary.h"
+#include "CmcLibrary.h"
+#include "MknLibrary.h"
+#include "CoordinateLibrary.h"
+#include "ExcLibrary.h"
 
 #include <base/bind.h>
 #include <base/threading/thread.h>
@@ -61,6 +67,8 @@ private:
     base::Thread mThread;
     const camera_algorithm_callback_ops_t* mCallback;
 
+    bool mIaLogInitialized;
+
     // key: shared memory fd from client
     // value: handle that returns from RegisterBuffer()
     std::unordered_map<int32_t, int32_t> mHandles;
@@ -74,7 +82,12 @@ private:
     // value: shared memory fd and mapped address
     std::unordered_map<int32_t, ShmInfo> mShmInfoMap;
 
+    AicLibrary mAic;
+    CmcLibrary mCmc;
+    ExcLibrary mExc;
     AiqLibrary mAiq;
+    MknLibrary mMkn;
+    CoordinateLibrary mCoordinate;
 
     int32_t mHandleSeed;
 };

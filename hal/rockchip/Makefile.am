@@ -26,6 +26,7 @@ lib_LTLIBRARIES = \
 
 if REMOTE_3A_SERVER
 3ASRC += psl/rkisp1/ipc/client/Rk3aCommon.cpp \
+         psl/rkisp1/ipc/client/Rk3aCoordinate.cpp \
          psl/rkisp1/ipc/client/Rk3aAiq.cpp
 else
 3ASRC += common/3awrapper/Rk3aAiq.cpp
