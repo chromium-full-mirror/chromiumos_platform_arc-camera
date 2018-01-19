@@ -46,6 +46,7 @@ HAL_COMMON_SRC = \
     3a/RkAWBStateMachine.cpp \
     3a/Rk3aPlus.cpp \
     3a/Rk3aCore.cpp \
+    3a/Rk3aHelper.cpp \
     copied_utils/camera/CameraMetadata.cpp \
     copied_utils/system/camera_metadata.cpp \
     platformdata/gc/GraphConfigManager.cpp \
@@ -123,6 +124,7 @@ libhalcommon_include_HEADERS = \
     3a/RkAWBStateMachine.h \
     3a/Rk3aPlus.h \
     3a/Rk3aCore.h \
+    3a/Rk3aHelper.h \
     CommonUtilMacros.h
 
 pkgconfiglibdir = $(libdir)/pkgconfig
