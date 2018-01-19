@@ -320,7 +320,7 @@ exit:
 
 bool OutputFrameWorker::isHalUsingRequestBuffer()
 {
-    LOG2("%s, mNeedPostProcess %d, mListeners.size() %zu",
+    LOG2("%s, mNeedPostProcess %d, mListeners.size() %lu",
           __FUNCTION__, mNeedPostProcess, mListeners.size());
     return (mNeedPostProcess || mListeners.size() > 0);
 }
