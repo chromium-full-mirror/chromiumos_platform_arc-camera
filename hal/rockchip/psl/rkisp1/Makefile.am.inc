@@ -43,6 +43,8 @@ PSLSRC = \
     psl/rkisp1/workers/OutputFrameWorker.cpp \
     psl/rkisp1/workers/StatisticsWorker.cpp \
     psl/rkisp1/workers/ParameterWorker.cpp \
+    psl/rkisp1/RuntimeParamsHelper.cpp \
+    psl/rkisp1/RKISP1ISPPipe.cpp \
     psl/rkisp1/MediaCtlHelper.cpp \
     common/platformdata/gc/FormatUtils.cpp \
     psl/rkisp1/NodeTypes.cpp
@@ -56,7 +58,8 @@ PSLCPPFLAGS = \
     -I$(top_srcdir)/include/ia_imaging \
     -I$(top_srcdir)/include/rk_imaging \
     -DCAMERA_RKISP1_SUPPORT \
-    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F
+    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F \
+    -DMACRO_KBL_AIC
 
 if REMOTE_3A_SERVER
 PSLCPPFLAGS += \
@@ -90,6 +93,8 @@ endif
 if REMOTE_3A_SERVER
 lib_LTLIBRARIES += libcam_algo.la
 libcam_algo_la_SOURCES = \
+    psl/rkisp1/RKISP1ISPPipe.cpp \
+    psl/rkisp1/RuntimeParamsHelper.cpp \
     psl/rkisp1/ipc/server/Rockchip3AServer.cpp \
     psl/rkisp1/ipc/server/AicLibrary.cpp \
     psl/rkisp1/ipc/server/CmcLibrary.cpp \
@@ -117,6 +122,7 @@ libcam_algo_la_CPPFLAGS = \
     -I$(ROOT)/usr/include/base-$(BASE_VER) \
     $(LIBUTILS_CFLAGS) \
     -D__USE_ANDROID_METADATA__ \
+    -DMACRO_KBL_AIC \
     -DCAMERA_HAL_DEBUG \
     -DREMOTE_3A_SERVER
 
