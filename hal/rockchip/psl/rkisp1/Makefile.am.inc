@@ -47,6 +47,7 @@ PSLSRC = \
     psl/rkisp1/RKISP1ISPPipe.cpp \
     psl/rkisp1/MediaCtlHelper.cpp \
     common/platformdata/gc/FormatUtils.cpp \
+    psl/rkisp1/statsConverter/rkisp1-stats.cpp \
     psl/rkisp1/NodeTypes.cpp
 
 PSLCPPFLAGS = \
