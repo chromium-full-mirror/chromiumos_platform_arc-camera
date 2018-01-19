@@ -85,21 +85,17 @@ public:
     virtual ~IISysObserver() {};
 };
 
-/**
- * \class InputSystemBase
- * used for capture unit is integrated in ISP.
- * compatible with the system that the capture unit
- * is out of ISP.
- */
-class InputSystemBase: public ISettingsSyncListener,
-                       public MediaCtlHelper::IOpenCallBack
+class InputSystem:  public IMessageHandler,
+                    public IPollEventListener,
+                    public ISettingsSyncListener,
+                    public MediaCtlHelper::IOpenCallBack
 {
 public: /* types */
    typedef std::map<NodeTypes, std::shared_ptr<V4L2VideoNode>> ConfiguredNodesPerName;
 
 public:
-    InputSystemBase(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl);
-    virtual ~InputSystemBase();
+    InputSystem(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl);
+    ~InputSystem();
 
     status_t configure(IStreamConfigProvider &streamConfigProv,
                        MediaCtlHelper::ConfigurationResults &outData);
@@ -110,62 +106,24 @@ public:
 
     status_t putFrame(NodeTypes isysNodeName, const V4L2Buffer *buf, int32_t reqId);
     status_t setBufferPool(NodeTypes isysNodeName, std::vector<V4L2Buffer> &pool, bool cached);
-    virtual status_t releaseBufferPools();
-    virtual status_t getOutputNodes(ConfiguredNodesPerName **nodes, int &nodeCount);
-    virtual std::shared_ptr<V4L2VideoNode> findOutputNode(NodeTypes isysNodeName);
-    virtual status_t enqueueMediaRequest(int32_t requestId);
-    virtual status_t capture(int requestId);
-    virtual status_t flush();
+    status_t releaseBufferPools();
+    status_t getOutputNodes(ConfiguredNodesPerName **nodes, int &nodeCount);
+    std::shared_ptr<V4L2VideoNode> findOutputNode(NodeTypes isysNodeName);
+    status_t enqueueMediaRequest(int32_t requestId);
+    status_t capture(int requestId);
+    status_t flush();
+    // IPollEvenListener
+    virtual status_t notifyPollEvent(PollEventMessage *msg);
 
-    virtual status_t requestExitAndWait();
-    protected:
-        MediaCtlHelper mMediaCtlHelper;
-        IISysObserver* mObserver; /* InputSystem doesn't own mObserver */
-        bool mStarted;
-        ConfiguredNodesPerName mConfiguredNodesPerName; /**< Configured video nodes, Key: ISYS node name */
-    private: /* members */
-        std::vector<V4L2BufferInfo> mBufferPool;  /*!< This is the active buffer pool */
-        /* req_id, buf_idx*/
-        std::map<int32_t, int32_t> mInflightRequest;
-        virtual status_t opened(NodeTypes isysNodeName,
-                                std::shared_ptr<V4L2VideoNode> videoNode) { return 0;};
-};
+    status_t setIsaConfig(int enabledBlocks);
+    status_t setIsaFormat(int pgSize, int payloadSize);
+    status_t setStatsFormat(int pgSize, int payloadSize);
+    status_t requestExitAndWait();
 
-class InputSystem:  InputSystemBase,
-    public IMessageHandler,
-    public IPollEventListener
-{
-    public: /* types */
-        typedef std::map<NodeTypes, std::shared_ptr<V4L2VideoNode>> ConfiguredNodesPerName;
-
-    public:
-        InputSystem(IISysObserver *observer, std::shared_ptr<MediaController> mediaCtl);
-        virtual ~InputSystem();
-
-        status_t configure(IStreamConfigProvider &streamConfigProv,
-                MediaCtlHelper::ConfigurationResults &outData);
-
-        status_t start();
-        status_t stop(bool keepBuffers = false);
-        bool isStarted();
-
-        status_t putFrame(NodeTypes isysNodeName, const V4L2Buffer *buf, int32_t reqId);
-        status_t setBufferPool(NodeTypes isysNodeName, std::vector<V4L2Buffer> &pool, bool cached);
-        status_t releaseBufferPools();
-        status_t getOutputNodes(ConfiguredNodesPerName **nodes, int &nodeCount);
-        std::shared_ptr<V4L2VideoNode> findOutputNode(NodeTypes isysNodeName);
-        status_t enqueueMediaRequest(int32_t requestId);
-        status_t capture(int requestId);
-        status_t flush();
-        // IPollEvenListener
-        virtual status_t notifyPollEvent(PollEventMessage *msg);
-
-        status_t requestExitAndWait();
-
-    private: /* methods */
-        status_t grabFrame(NodeTypes isysNodeName, V4L2BufferInfo *buf);
-        status_t pollNextRequest();
-        status_t getIsysNodeName(std::shared_ptr<V4L2VideoNode> node, NodeTypes &isysNodeName);
+private: /* methods */
+    status_t grabFrame(NodeTypes isysNodeName, V4L2BufferInfo *buf);
+    status_t pollNextRequest();
+    status_t getIsysNodeName(std::shared_ptr<V4L2VideoNode> node, NodeTypes &isysNodeName);
 
     // thread message IDs
     enum MessageId {
@@ -280,14 +238,14 @@ class InputSystem:  InputSystemBase,
     status_t opened(NodeTypes isysNodeName,
                     std::shared_ptr<V4L2VideoNode> videoNode);
 private: /* members */
-    //IISysObserver*      mObserver; /* InputSystem doesn't own mObserver */
+    IISysObserver*      mObserver; /* InputSystem doesn't own mObserver */
     std::shared_ptr<MediaController> mMediaCtl;
-    //MediaCtlHelper mMediaCtlHelper;
+    MediaCtlHelper mMediaCtlHelper;
 
-    //bool                mStarted;
+    bool                mStarted;
 
     std::vector<std::shared_ptr<V4L2VideoNode>>  mConfiguredNodes;        /**< Configured video nodes */
-    //ConfiguredNodesPerName mConfiguredNodesPerName; /**< Configured video nodes, Key: ISYS node name */
+    ConfiguredNodesPerName mConfiguredNodesPerName; /**< Configured video nodes, Key: ISYS node name */
 
     struct IsysRequest {
         int32_t requestId;

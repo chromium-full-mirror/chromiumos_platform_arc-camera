@@ -337,6 +337,8 @@ RkAFModeOff::processResult(rk_aiq_af_results& afResults,
     UNUSED(afResults);
     HAL_TRACE_CALL_PRETTY(CAMERA_DEBUG_LOG_LEVEL2);
 
+    // Af assist flash light should be disable for OFF mode
+    afResults.use_af_assist = false;
     mCurrentAfState = ANDROID_CONTROL_AF_STATE_INACTIVE;
     updateResult(result);
 
@@ -450,6 +452,15 @@ RkAFModeAuto::processResult(rk_aiq_af_results& afResult,
 
     checkIfFocusTimeout();
 
+    /**
+     * Check if focus is locked or timed out
+     * In these cases turn off the assist light.
+     */
+    if (mLastActiveTriggerTime == 0 ||
+         mCurrentAfState == ANDROID_CONTROL_AF_STATE_FOCUSED_LOCKED ||
+         mCurrentAfState == ANDROID_CONTROL_AF_STATE_NOT_FOCUSED_LOCKED) {
+        afResult.use_af_assist = false;
+    }
 
     updateResult(result);
 
@@ -585,6 +596,12 @@ RkAFModeContinuousPicture::processResult(rk_aiq_af_results& afResult,
     }
 
     checkIfFocusTimeout();
+
+    // the af_assist is confusing the flash sequence and AE so disable it when no af trigger coming.
+    // in the future we could disable the af_assist request after we have
+    // timed out or successfully finished with focusing
+    if (mLastActiveTriggerTime == 0)
+        afResult.use_af_assist = false;
 
     updateResult(result);
     return OK;

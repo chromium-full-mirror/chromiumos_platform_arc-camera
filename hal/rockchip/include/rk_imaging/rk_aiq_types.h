@@ -23,125 +23,18 @@
  * \brief Definitions of input/output structures of the Rockchip 3A library.
  */
 
-#ifndef __RK_AIQ_TYPES_H__
-#define __RK_AIQ_TYPES_H__
+#ifndef _IA_AIQ_TYPES_H_
+#define _IA_AIQ_TYPES_H_
 
+#include "ia_types.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define RK_AIQ_AFM_MAX_WINDOWS             3
-#define RK_AIQ_LSC_GRAD_TBL_SIZE           8
-#define RK_AIQ_LSC_SIZE_TBL_SIZE           8
-#define RK_AIQ_LSC_DATA_TBL_SIZE           289
-#define RK_AIQ_DEGAMMA_CURVE_SIZE          17
-#define RK_AIQ_GAMMA_OUT_MAX_SAMPLES       34
-#define RK_AIQ_HISTOGRAM_WEIGHT_GRIDS_SIZE 25
-#define RK_AIQ_AE_MEAN_MAX                 25
-#define RK_AIQ_HIST_BIN_N_MAX              16
-#define RK_AIQ_WDR_MAX_CURVE_SIZE          33
-#define RK_AIQ_DPF_MAX_NLF_COEFFS          17
-#define RK_AIQ_DPF_MAX_SPATIAL_COEFFS      6
-#define RK_AIQ_AWB_MAX_GRID                1
-
-#define HAL_ISP_BPC_MASK            (1 << 0)
-#define HAL_ISP_BLS_MASK            (1 << 1)
-#define HAL_ISP_SDG_MASK            (1 << 2)
-#define HAL_ISP_HST_MASK            (1 << 3)
-#define HAL_ISP_LSC_MASK            (1 << 4)
-#define HAL_ISP_AWB_GAIN_MASK       (1 << 5)
-#define HAL_ISP_FLT_MASK            (1 << 6)
-#define HAL_ISP_BDM_MASK            (1 << 7)
-#define HAL_ISP_CTK_MASK            (1 << 8)
-#define HAL_ISP_GOC_MASK            (1 << 9)
-#define HAL_ISP_CPROC_MASK          (1 << 10)
-#define HAL_ISP_AFC_MASK            (1 << 11)
-#define HAL_ISP_AWB_MEAS_MASK       (1 << 12)
-#define HAL_ISP_IE_MASK             (1 << 13)
-#define HAL_ISP_AEC_MASK            (1 << 14)
-#define HAL_ISP_WDR_MASK            (1 << 15)
-#define HAL_ISP_DPF_MASK            (1 << 16)
-#define HAL_ISP_DPF_STRENGTH_MASK   (1 << 17)
-
-#define HAL_ISP_ALL_MASK            (0xffffffff)
-
-/*----------------------- AIQ related start ---------------------*/
-
-typedef struct
-{
-  unsigned int coeff[9U];
-} rk_aiq_3x3Matrix;
-
-typedef struct
-{
-  unsigned short    h_offset;
-  unsigned short    v_offset;
-  unsigned short    width;
-  unsigned short    height;
-} rk_aiq_window;
-
-/*!
- * \brief Frame parameters which describe cropping and scaling (need to be filled by AIQ client for every frame)
- */
-typedef struct
-{
-  unsigned short horizontal_crop_offset;            /*!< Read out offset horizontal. */
-  unsigned short vertical_crop_offset;              /*!< Read out offset vertical. */
-  unsigned short cropped_image_width;               /*!< Width of cropped area in native resolution. */
-  unsigned short cropped_image_height;              /*!< Height of cropped area in native resolution. */
-  unsigned char horizontal_scaling_numerator;       /*!< Horizontal scaling factor applied to the cropped image. Horizontal scaling factor = horizontal_scaling_numerator / horizontal_scaling_denominator. */
-  unsigned char horizontal_scaling_denominator;     /*!< Horizontal scaling factor applied to the cropped image. Horizontal scaling factor = horizontal_scaling_numerator / horizontal_scaling_denominator. */
-  unsigned char vertical_scaling_numerator;         /*!< Vertical scaling factor applied to the cropped image. Vertical scaling factor = vertical_scaling_numerator / vertical_scaling_denominator. */
-  unsigned char vertical_scaling_denominator;       /*!< Vertical scaling factor applied to the cropped image. Vertical scaling factor = vertical_scaling_numerator / vertical_scaling_denominator. */
-} rk_aiq_frame_params;
-
-typedef enum
-{
-    rk_aiq_ae_flicker_reduction_off,     /*!< Disables flicker detection and reduction. */
-    rk_aiq_ae_flicker_reduction_50hz,    /*!< Manual flicker reduction for 50Hz mains frequency. */
-    rk_aiq_ae_flicker_reduction_60hz,    /*!< Manual flicker reduction for 60Hz mains frequency. */
-    rk_aiq_ae_flicker_reduction_auto,    /*!< Detects flicker frequency and applies detected reduction. */
-    rk_aiq_ae_flicker_reduction_detect,  /*!< Detects only flicker frequency but doesn't apply reduction. */
-} rk_aiq_ae_flicker_reduction;
-
-/*!
- * \brief AEC operation modes.
- */
-typedef enum
-{
-    rk_aiq_ae_operation_mode_automatic,         /*!< Automatic mode. */
-    rk_aiq_ae_operation_mode_long_exposure,     /*!< AEC produces exposure parameters with long exposure (low light & static) scene. */
-    rk_aiq_ae_operation_mode_action,            /*!< AEC produces exposure parameters for fast moving scene. */
-    rk_aiq_ae_operation_mode_video_conference,  /*!< AEC produces exposure parameters which can be used in video conferencing scene. */
-    rk_aiq_ae_operation_mode_production_test,   /*!< AEC produces exposure parameters which are used in production test environment. */
-    rk_aiq_ae_operation_mode_ultra_low_light,   /*!< AEC produces exposure parameters which are used in ultra low light scene. */
-    rk_aiq_ae_operation_mode_fireworks,         /*!< AEC produces exposure parameters which are used in fireworks scene. */
-    rk_aiq_ae_operation_mode_hdr,               /*!< AEC produces exposure parameters which are used for HDR imaging (vHDR or exposure bracketing). */
-    rk_aiq_ae_operation_mode_custom_1,          /*!< AEC produces exposure parameters for a specialized custom scene 1. */
-    rk_aiq_ae_operation_mode_custom_2,          /*!< AEC produces exposure parameters for a specialized custom scene 2. */
-    rk_aiq_ae_operation_mode_custom_3,          /*!< AEC produces exposure parameters for a specialized custom scene 3. */
-} rk_aiq_ae_operation_mode;
-
-/*!
- * \brief AEC metering modes.
- */
-typedef enum
-{
-    rk_aiq_ae_metering_mode_evaluative,  /*!< Exposure is evaluated from the whole frame. */
-    rk_aiq_ae_metering_mode_center,      /*!< Exposure is evaluated center weighted. */
-} rk_aiq_ae_metering_mode;
-
-/*!
- * \brief AEC priority modes.
- */
-typedef enum
-{
-    rk_aiq_ae_priority_mode_normal,    /*!< All areas are equally important. */
-    rk_aiq_ae_priority_mode_highlight, /*!< Highlights must be preserved even if it means that dark parts become very dark. */
-    rk_aiq_ae_priority_mode_shadow,    /*!< Shadow areas are more important. */
-} rk_aiq_ae_priority_mode;
+#define MAX_COLOR_CONVERSION_MATRIX 3
+typedef struct rk_aiq_t rk_aiq;
 
 /*!
  * \brief Target (frame use) for the analysis algorithms calculations.
@@ -167,6 +60,82 @@ typedef enum
 } rk_aiq_camera_orientation;
 
 /*!
+ * \brief AEC flicker reduction modes.
+ */
+typedef enum
+{
+    rk_aiq_ae_flicker_reduction_off,     /*!< Disables flicker detection and reduction. */
+    rk_aiq_ae_flicker_reduction_50hz,    /*!< Manual flicker reduction for 50Hz mains frequency. */
+    rk_aiq_ae_flicker_reduction_60hz,    /*!< Manual flicker reduction for 60Hz mains frequency. */
+    rk_aiq_ae_flicker_reduction_auto,    /*!< Detects flicker frequency and applies detected reduction. */
+    rk_aiq_ae_flicker_reduction_detect,  /*!< Detects only flicker frequency but doesn't apply reduction. */
+} rk_aiq_ae_flicker_reduction;
+
+/*!
+ * \brief AEC operation modes.
+ */
+typedef enum {
+    rk_aiq_ae_operation_mode_automatic,         /*!< Automatic mode. */
+    rk_aiq_ae_operation_mode_long_exposure,     /*!< AEC produces exposure parameters with long exposure (low light & static) scene. */
+    rk_aiq_ae_operation_mode_action,            /*!< AEC produces exposure parameters for fast moving scene. */
+    rk_aiq_ae_operation_mode_video_conference,  /*!< AEC produces exposure parameters which can be used in video conferencing scene. */
+    rk_aiq_ae_operation_mode_production_test,   /*!< AEC produces exposure parameters which are used in production test environment. */
+    rk_aiq_ae_operation_mode_ultra_low_light,   /*!< AEC produces exposure parameters which are used in ultra low light scene. */
+    rk_aiq_ae_operation_mode_fireworks,         /*!< AEC produces exposure parameters which are used in fireworks scene. */
+    rk_aiq_ae_operation_mode_hdr,               /*!< AEC produces exposure parameters which are used for HDR imaging (vHDR or exposure bracketing). */
+    rk_aiq_ae_operation_mode_custom_1,          /*!< AEC produces exposure parameters for a specialized custom scene 1. */
+    rk_aiq_ae_operation_mode_custom_2,          /*!< AEC produces exposure parameters for a specialized custom scene 2. */
+    rk_aiq_ae_operation_mode_custom_3,          /*!< AEC produces exposure parameters for a specialized custom scene 3. */
+} rk_aiq_ae_operation_mode;
+
+/*!
+ * \brief AEC metering modes.
+ */
+typedef enum {
+    rk_aiq_ae_metering_mode_evaluative,  /*!< Exposure is evaluated from the whole frame. */
+    rk_aiq_ae_metering_mode_center,      /*!< Exposure is evaluated center weighted. */
+} rk_aiq_ae_metering_mode;
+
+/*!
+ * \brief AEC priority modes.
+ */
+typedef enum {
+    rk_aiq_ae_priority_mode_normal,    /*!< All areas are equally important. */
+    rk_aiq_ae_priority_mode_highlight, /*!< Highlights must be preserved even if it means that dark parts become very dark. */
+    rk_aiq_ae_priority_mode_shadow,    /*!< Shadow areas are more important. */
+} rk_aiq_ae_priority_mode;
+
+/*!
+ * \brief AEC exposure distribution priority modes
+ *
+ * This enumeration values are used to control distribution of AEC exposure parameters. For example in some situation user may want to keep
+ * aperture at smallest value (in order to have large DOF) as long as possible in expense of motion blur (caused by long exposure time) and
+ * noise (caused by high ISO).
+ *
+ * Note. Manual priority modes as understood by SLRs are achieved by using manual exposure parameters when running AEC:
+ * Shutter priority: Set manual_exposure_time_us in rk_aiq_ae_input_params.
+ * ISO priority: Set manual_iso in rk_aiq_ae_input_params.
+ * Aperture priority: Set manual_aperture_fn in rk_aiq_ae_input_params.
+ */
+typedef enum
+{
+    rk_aiq_ae_exposure_distribution_auto,     /*!< AEC internally prioritizes between exposure time, aperture and ISO when calculating distribution. */
+    rk_aiq_ae_exposure_distribution_shutter,  /*!< AEC tries to keep the exposure time at minimum until ISO and aperture are at maximum. */
+    rk_aiq_ae_exposure_distribution_iso,      /*!< AEC tries to keep the ISO at minimum until exposure time and aperture are at maximum. */
+    rk_aiq_ae_exposure_distribution_aperture, /*!< AEC tries to keep the aperture at minimum until exposure time and ISO are at maximum. */
+} rk_aiq_ae_exposure_distribution_priority;
+
+/*!
+ * \brief AEC feature setting.
+ */
+typedef enum {
+    rk_aiq_ae_feature_setting_tuning,     /*!< Feature setting is taken from tuning data. */
+    rk_aiq_ae_feature_setting_disabled,   /*!< Feature setting is disabled. */
+    rk_aiq_ae_feature_setting_enabled,    /*!< Feature setting is enabled. */
+} rk_aiq_ae_feature_setting;
+
+
+/*!
  * \brief Autofocus states
  */
 typedef enum
@@ -178,6 +147,16 @@ typedef enum
     rk_aiq_af_status_fail,               /*!< Focus has failed */
     rk_aiq_af_status_depth_search        /*!< Focus in depth search mode */
 } rk_aiq_af_status;
+
+/*!
+ * \brief Action for the lens driver
+ */
+typedef enum
+{
+    rk_aiq_lens_driver_action_none,
+    rk_aiq_lens_driver_action_move_to_unit,
+    rk_aiq_lens_driver_action_move_by_units
+} rk_aiq_lens_driver_action;
 
 /*!
  * \brief Autofocus modes
@@ -204,34 +183,45 @@ typedef enum
     rk_aiq_af_range_extended,                      /*!< Extended/full range */
 } rk_aiq_af_range;
 
+
 /*!
  * \brief Autofocus metering modes
  */
 typedef enum
 {
     rk_aiq_af_metering_mode_auto,                      /*!< Auto metering mode */
-    rk_aiq_af_metering_modeouch                      /*!< Touch metering mode */
+    rk_aiq_af_metering_mode_touch                      /*!< Touch metering mode */
 } rk_aiq_af_metering_mode;
 
-typedef struct
+/*!
+ * \brief Lens actuator status
+ */
+typedef enum
 {
-    bool          enabled;
-    unsigned char num_afm_win;
-    rk_aiq_window afm_win[RK_AIQ_AFM_MAX_WINDOWS];
-    unsigned int  thres;
-    unsigned int  var_shift;
-} rk_aiq_afc_cfg;
+    rk_aiq_lens_status_stopped,                    /*!< Lens has not moved during the frame integration*/
+    rk_aiq_lens_status_moving                      /*!< Lens has been moving during the frame integration */
+} rk_aiq_lens_status;
 
-typedef struct
+/*!
+ * \brief Action for the manual focus
+ */
+typedef enum
 {
-    unsigned int sum;
-    unsigned int lum;
-} rk_aiq_af_meas_val;
+    rk_aiq_manual_focus_action_none,                /*!< No action for the manual focus is required */
+    rk_aiq_manual_focus_action_set_distance,        /*!< Set manual focus distance */
+    rk_aiq_manual_focus_action_set_lens_position,   /*!< Set manual lens position */
+    rk_aiq_manual_focus_action_set_focal_distance   /*!< Set manual focal distance in um (distance between the lens and the sensor plane, e.g. 4390) */
+} rk_aiq_manual_focus_action;
 
-typedef struct
+/*!
+ * \brief Focus bracketing mode.
+ */
+typedef enum
 {
-    rk_aiq_af_meas_val window[RK_AIQ_AFM_MAX_WINDOWS];
-} rk_aiq_af_meas_stat;
+    rk_aiq_af_bracket_mode_symmetric,        /*!< Symmetric focus bracketing around the reference lens position*/
+    rk_aiq_af_bracket_mode_towards_near,     /*!< One side focus bracketing. Images are taken towards NEAR end (macro) */
+    rk_aiq_af_bracket_mode_towards_far       /*!< One side focus bracketing. Images are taken towards FAR end (infinity)*/
+} rk_aiq_af_bracket_mode;
 
 /*!
  * \brief Detected scene mode.
@@ -254,6 +244,27 @@ typedef enum
 } rk_aiq_scene_mode;
 
 /*!
+* \brief Mode for calculating AE bracketing.
+*/
+typedef enum
+{
+    rk_aiq_bracket_mode_none,             /*!< No bracketing used. */
+    rk_aiq_bracket_mode_ull  = (1 << 0),  /*!< Ultra Low Light bracketing used. */
+    rk_aiq_bracket_mode_hdr  = (1 << 1)   /*!< High Dynamic Range bracketing used. */
+} rk_aiq_bracket_mode;
+
+/*!
+ * \brief Manual focus parameters.
+ */
+typedef struct
+{
+    unsigned int manual_focus_distance;               /*!< Manual focus distance in mm*/
+    int manual_lens_position;                         /*!< Manual lens position */
+    unsigned int manual_focal_distance;               /*!< Manual focal_distance in um (e.g. 4390) */
+    rk_aiq_manual_focus_action manual_focus_action;   /*!< Manual focus action */
+} rk_aiq_manual_focus_parameters;
+
+/*!
  * \brief Exposure parameters in terms of generic units.
  * Structure can be used as input or output from AEC.
  */
@@ -262,6 +273,9 @@ typedef struct
     int exposure_time_us;          /*!< Exposure time in microseconds, -1 if N/A. */
     float analog_gain;             /*!< Analog gain as a multiplier (e.g. 1.0), -1.0 if N/A. */
     float digital_gain;            /*!< Digital gain as a multiplier (e.g. 1.0), -1.0 if N/A. */
+    float aperture_fn;             /*!< f-number of aperture (e.g. 2.8), -1.0 for N/A. TODO: Move to rk_aiq_aperture_control structure. */
+    int total_target_exposure;     /*!< Total exposure ie. combination of Et, Ag, Dg, Aperture gain and ND gain, -1 if N/A. */
+    bool nd_filter_enabled;        /*!< true or false, false for N/A. */
     int iso;                       /*!< ISO value corresponding to the analog gain. -1 if N/A. */
 } rk_aiq_exposure_parameters;
 
@@ -293,10 +307,25 @@ typedef struct
     unsigned short fine_integration_time_max_margin;   /*!< fine_integration_time_max = pixel_periods_per_line - fine_integration_time_max_margin. */
     unsigned short coarse_integration_time_min;        /*!< The minimum allowed value for coarse_integration_time in AEC outputs. */
     unsigned short coarse_integration_time_max_margin; /*!< coarse_integration_time_max = line_periods_per_field - coarse_integration_time_max_margin */
-    unsigned short sensor_output_width;
-    unsigned short sensor_output_height;
 } rk_aiq_exposure_sensor_descriptor;
 
+/*!
+ * AEC features.
+ * Parameters for enabling/disabling AEC features. Setting rk_aiq_ae_feature_setting_tuning takes feature definitions from CPF.
+ */
+typedef struct {
+
+    rk_aiq_ae_feature_setting motion_blur_control;      /*!< AEC modifies exposure time/analog gain ratio based on movement in the image. */
+    rk_aiq_ae_feature_setting backlight_compensation;   /*!< AEC analyzes and modifies exposure parameters based on backlight detection algorithm. */
+    rk_aiq_ae_feature_setting face_utilization;         /*!< AEC uses face coordinates in exposure calculations for next frame. */
+    rk_aiq_ae_feature_setting red_eye_reduction_flash;  /*!< AEC will propose flashes before pre-flashes to reduce red eye effect. */
+    rk_aiq_ae_feature_setting fill_in_flash;            /*!< AEC will propose flash in back light situations, where target is close enough. */
+} rk_aiq_ae_features;
+
+
+/*!
+ * \brief Flash modes from the user.
+ */
 typedef enum
 {
     rk_aiq_flash_mode_auto,
@@ -317,19 +346,151 @@ typedef enum
 } rk_aiq_flash_status;
 
 /*!
- * \brief Manual focus parameters.
+ * \brief Depth data type.
+ */
+typedef enum
+{
+    rk_aiq_depth_data_type_vcm,     /*!< VCM units */
+    rk_aiq_depth_data_type_mm,      /*!< Distance to the object in mm */
+} rk_aiq_depth_data_type;
+
+/*!
+ * \brief Flash parameters.
+ * Structure can be used as input or output from AEC.
  */
 typedef struct
 {
-    unsigned int manual_focus_distance;               /*!< Manual focus distance in mm*/
-    int manual_lens_position;                         /*!< Manual lens position */
-    unsigned int manual_focal_distance;               /*!< Manual focal_distance in um (e.g. 4390) */
-} rk_aiq_manual_focus_parameters;
+    rk_aiq_flash_status status;  /*!< Flash status. */
+    char power_prc;              /*!< Flash power [0,100] value range maps 0% to 100%, 0 if off. */
+} rk_aiq_flash_parameters;
+
+
+/*!
+ * \brief Grid for weighted histograms.
+ * Pixel values of certain area can be weighted differently based of specified grid.
+ * Weight grid should be passed and used by the component which is calculating the histograms from the frame data. If no pixel accurate
+ * histograms are calculated, the weight map should be given back to AIQ library along with the statistics so that AIQ library can
+ * calculate the weighted histograms itself from the RGBS statistics.
+ * This structure is output as part of AEC results but it can be replaced with custom weight map.
+ */
+typedef struct
+{
+    unsigned short width;   /*!< Width of the weight grid. */
+    unsigned short height;  /*!< Height of the weight grid. */
+    unsigned char *weights; /*!< Multipliers (weight) of RGB values in the grid. Values range [0, 15]. */
+} rk_aiq_hist_weight_grid;
+
+/*!
+ * \brief Histogram.
+ * AIQ uses internally histogram, which are calculated from RGBS statistics:
+ * - "RAW" frame data i.e. RGBS statistics (corrected BLC + LSC).
+ * - "Color corrected" frame data (corrected BLC + LSC + CCM + WB)
+ * - "Color corrected and weighted" frame data (corrected BLC + LSC + CCM + WB + Weight Map)
+ * If histograms are calculated outside AIQ from frame pixel data (more accurate), it is expected to be "Color corrected and weighted".
+ * Size of histogram data arrays behind the pointers depends on value of num_bins variable in the structure.
+ */
+typedef struct
+{
+    unsigned int num_bins;            /*!< Number of histogram bins. */
+    unsigned int *r;                  /*!< R histogram. */
+    unsigned int *g;                  /*!< G (both Gr and Gb values) histogram. */
+    unsigned int *b;                  /*!< B histogram. */
+    unsigned int *rgb;                /*!< Combined RGB histogram (all pixel values of R, G and B together) TODO: Remove?. Used in percentile calculation but if GW AWB is done always, the same values are calculated. */
+    unsigned int *rgb_ch;             /*!< RGB channel-independent histogram where all channels are treated as grayscale intensities and combined into one histogram. */
+    unsigned int *y;                  /*!< Luminance histogram. */
+    unsigned int num_r_elements;      /*!< Number of elements in the R histogram. */
+    unsigned int num_g_elements;      /*!< Number of elements in the G histogram. */
+    unsigned int num_b_elements;      /*!< Number of elements in the B histogram. */
+    unsigned int num_rgb_elements;    /*!< Number of elements in the combined RGB histogram. */
+    unsigned int num_rgb_ch_elements; /*!< Number of elements in the RGB channel-independent histogram. */
+    unsigned int num_y_elements;      /*!< Number of elements in the luminance histogram. */
+} rk_aiq_histogram;
+
+/*!
+ * \brief Grid block
+ * As defined in the AIQ statistics specification.
+ * Ranges of all parameters are [0, 255].
+ */
+typedef struct
+{
+    unsigned char avg_gr; /*!< Average Gr value in the grid. */
+    unsigned char avg_r;  /*!< Average R value in the grid. */
+    unsigned char avg_b;  /*!< Average B value in the grid. */
+    unsigned char avg_gb; /*!< Average Gb value in the grid. */
+    unsigned char sat;    /*!< Percentage of saturated pixels in the block [0, 255]. */
+} rgbs_grid_block;
+
+/*!
+ * \brief R, G, B and Saturation grid block.
+ * As defined in the AIQ statistics specification.
+ * RGBS grid covers the full Field Of View (FOV) of the sensor.
+ */
+typedef struct
+{
+    rgbs_grid_block *blocks_ptr;  /*!< RGBS blocks. */
+    unsigned short grid_width;    /*!< Grid width. */
+    unsigned short grid_height;   /*!< Grid height. */
+} rk_aiq_rgbs_grid; /* rk_aiq_rgbs_grid owns this */
+
+/*!
+ * \brief Grid block for 32-bit HDR.
+ * As defined in the AIQ statistics specification.
+ * Ranges of all parameters are [0, 255].
+ */
+typedef struct
+{
+    unsigned int avg_gr; /*!< Average Gr value in the grid. */
+    unsigned int avg_r;  /*!< Average R value in the grid. */
+    unsigned int avg_b;  /*!< Average B value in the grid. */
+    unsigned int avg_gb; /*!< Average Gb value in the grid. */
+    unsigned int sat;    /*!< Percentage of saturated pixels in the block [0, 255]. */
+} hdr_rgbs_grid_block;
+
+/*!
+ * \brief R, G, B and Saturation grid block for 32-bit HDR statistics.
+ * As defined in the AIQ statistics specification.
+ * HDR RGBS grid covers the full Field Of View (FOV) of the sensor.
+ */
+typedef struct
+{
+    hdr_rgbs_grid_block *blocks_ptr;    /*!< HDR RGBS blocks. */
+    unsigned int grid_width;            /*!< Grid width. */
+    unsigned int grid_height;           /*!< Grid height. */
+    unsigned int grid_data_bit_depth;   /*!< Bit depth of data in channel data. */
+} rk_aiq_hdr_rgbs_grid;
+
+/*!
+ * \brief AF statistics
+ * As defined in the AIQ statistics specification.
+ * AF grid covers the full Field Of View (FOV) of the sensor.
+ */
+typedef struct
+{
+    unsigned short grid_width;    /*!< Number of block elements horizontally in a grid. */
+    unsigned short grid_height;   /*!< Number of block elements vertically in a grid. */
+    unsigned short block_width;   /*!< Block width (bq per block element). */
+    unsigned short block_height;  /*!< Block height (bq per grid element). */
+    int *filter_response_1;       /*!< Filter response of filter 1 (e.g. low pass, used by auto focus). */
+    int *filter_response_2;       /*!< Filter response of filter 2 (e.g. high pass, used by auto focus). */
+} rk_aiq_af_grid; /* rk_aiq_af_grid owns filter_response_1 and filter_response_2 */
+
+/*!
+ * \brief Depth grid statistics
+ */
+typedef struct
+{
+    rk_aiq_depth_data_type type;          /*!< Data type (VCM units/mm)*/
+    ia_rectangle *grid_rect;              /*!< ROI for the grid */
+    int *depth_data;                      /*!< Depth data (type of data is defined by rk_aiq_depth_data_type) */
+    unsigned char *confidence;            /*!< Confidence level */
+    unsigned short grid_width;            /*!< Number of grid elements horizontally */
+    unsigned short grid_height;           /*!< Number of grid elements vertically */
+} rk_aiq_depth_grid;
 
 /*!
  * \brief AWB scene modes
  * Used in AWB as input to restrict White Point between certain CCT range.
- * Note that not in all cases only CCT range is used to restrict White Point but more intelligent estimation may be used.
+ * Note that not in all cases only CCT range is used to restrict White Point but more rockchipligent estimation may be used.
  */
 typedef enum
 {
@@ -360,6 +521,137 @@ typedef struct
 } rk_aiq_awb_manual_cct_range;
 
 /*!
+ * \brief Frame parameters which describe cropping and scaling (need to be filled by AIQ client for every frame)
+ */
+typedef struct
+{
+    unsigned short horizontal_crop_offset;            /*!< Read out offset horizontal. */
+    unsigned short vertical_crop_offset;              /*!< Read out offset vertical. */
+    unsigned short cropped_image_width;               /*!< Width of cropped area in native resolution. */
+    unsigned short cropped_image_height;              /*!< Height of cropped area in native resolution. */
+    unsigned char horizontal_scaling_numerator;       /*!< Horizontal scaling factor applied to the cropped image. Horizontal scaling factor = horizontal_scaling_numerator / horizontal_scaling_denominator. */
+    unsigned char horizontal_scaling_denominator;     /*!< Horizontal scaling factor applied to the cropped image. Horizontal scaling factor = horizontal_scaling_numerator / horizontal_scaling_denominator. */
+    unsigned char vertical_scaling_numerator;         /*!< Vertical scaling factor applied to the cropped image. Vertical scaling factor = vertical_scaling_numerator / vertical_scaling_denominator. */
+    unsigned char vertical_scaling_denominator;       /*!< Vertical scaling factor applied to the cropped image. Vertical scaling factor = vertical_scaling_numerator / vertical_scaling_denominator. */
+} rk_aiq_frame_params;
+
+/*!
+ * \brief DC iris control.
+ * When using DC iris, there are no distinct aperture steps. Use these commands to increase or decrease aperture size.
+ */
+typedef enum
+{
+    rk_aiq_aperture_control_dc_iris_auto,  /*!< State of the iris is selected automatically. */
+    rk_aiq_aperture_control_dc_iris_hold,  /*!< Iris should hold current aperture. */
+    rk_aiq_aperture_control_dc_iris_open,  /*!< Iris should open. */
+    rk_aiq_aperture_control_dc_iris_close, /*!< Iris should close. */
+} rk_aiq_aperture_control_dc_iris_command;
+
+/*!
+ * \brief Aperture control parameters.
+ * Aperture controls for both P (where iris has discrete amount of apertures) and DC (where iris has indefinite amount of possible apertures) iris.
+ */
+typedef struct
+{
+    float aperture_fn;                                       /*!< f-number of aperture (e.g. 2.8), -1.0 for N/A. Used only with P iris. */
+    rk_aiq_aperture_control_dc_iris_command dc_iris_command; /*!< Used only with DC iris. */
+    int code;                                                /*!< Iris module HW register value. */
+} rk_aiq_aperture_control;
+
+/*!
+ * \brief Exposure data for all exposures.
+ */
+typedef struct
+{
+    unsigned int exposure_index;                        /*!< Exposure index which identifies the exposure. */
+    rk_aiq_exposure_parameters* exposure;               /*!< Exposure parameters to be used in the next frame in generic format. */
+    rk_aiq_exposure_sensor_parameters* sensor_exposure; /*!< Exposure parameters to be used in the next frame in sensor specific format. */
+    float distance_from_convergence;                    /*!< Distance of convergence as an EV shift value. Negative is underexposure, positive is overexposure */
+    bool converged;                                     /*!< Indicates that AE has converged. */
+    unsigned int num_exposure_plan;                     /*!< Size of the exposure plan. Indicates how many exposure and sensor_exposure parameter structures are in the arrays above. */
+    unsigned int *exposure_plan_ids;                    /*!< Exposure plan IDs. Used to identify and sync what parameters were changed in the exposure plan. */
+} rk_aiq_ae_exposure_result;
+
+/*!
+ * \brief AEC results.
+ */
+typedef struct
+{
+    rk_aiq_ae_exposure_result* exposures;               /*!< Results for each exposure to be used in the next frame. */
+    unsigned int num_exposures;                         /*!< The number of calculated exposures. */
+    rk_aiq_hist_weight_grid* weight_grid;               /*!< Weight map to be used in the next frame histogram calculation. */
+    rk_aiq_flash_parameters* flashes;                   /*!< Array of flash parameters for each flashes to be used in the next frame. */
+    unsigned int num_flashes;                           /*!< Number of independent flashes. */
+    unsigned int lux_level_estimate;                    /*!< Lux level estimate. */
+    rk_aiq_bracket_mode multiframe;                     /*!< AEC may propose to use multiframe for optimal results. */
+    rk_aiq_ae_flicker_reduction flicker_reduction_mode; /*!< Flicker reduction mode proposed by the AEC algorithm */
+    rk_aiq_aperture_control *aperture_control;          /*!< Aperture control parameters. */
+} rk_aiq_ae_results;
+
+/*!
+ * \brief Autofocus algorithm results
+ */
+typedef struct
+{
+    rk_aiq_af_status status;                           /*!< Focus status */
+    unsigned short current_focus_distance;             /*!< Current focusing distance in mm */
+    int next_lens_position;                            /*!< Next lens position */
+    rk_aiq_lens_driver_action lens_driver_action;      /*!< Lens driver action*/
+    bool use_af_assist;                                /*!< True if the af assist light is to be used at half press, false otherwise */
+    bool final_lens_position_reached;                  /*!< Lens has reached the final lens position */
+} rk_aiq_af_results;
+
+/*!
+ * \brief Results from AWB.
+ */
+typedef struct
+{
+    float accurate_r_per_g;           /*!< Accurate White Point for the image. */
+    float accurate_b_per_g;           /*!< Accurate White Point for the image. */
+    float final_r_per_g;              /*!< Final White Point, including color appearance modeling. */
+    float final_b_per_g;              /*!< Final White Point, including color appearance modeling.*/
+    unsigned int cct_estimate;        /*!< Correlated Color Temperature estimate calculated from the accurate WP. */
+    float distance_from_convergence;  /*!< Range [0.0f, 1.0f]. Distance from convergence. Value 0.0f means converged. */
+} rk_aiq_awb_results;
+
+/*!
+ * \brief GBCE level.
+ * Allows to override GBCE level defined in the tuning.
+ */
+typedef enum
+{
+    rk_aiq_gbce_level_use_tuning = -1, /*!< Use GBCE level defined in the tuning. */
+    rk_aiq_gbce_level_bypass = 0,      /*!< Use the default gamma table without stretching. This level should be used when manual AE parameters are set. */
+    rk_aiq_gbce_level_gamma_stretch,   /*!< Apply histogram stretching. */
+    rk_aiq_gbce_level_gamma_stretch_and_power_adaptation, /*!< Histogram stretching & gamma power adaptation. */
+} rk_aiq_gbce_level;
+
+/*!
+* \brief Tone Map level.
+* Allows to override Tone Map level defined in the tuning.
+*/
+
+typedef enum
+{
+    rk_aiq_tone_map_level_use_tuning = -1,  /*!< Use Tone Map level defined in the tuning. */
+    rk_aiq_tone_map_level_bypass = 0,       /*!< Bypass TM LUT (i.e. legacy GBCE behavior) */
+    rk_aiq_tone_map_level_default,          /*!< Put the gains in TM LUT (gamma LUT will have sRGB gamma only) */
+    rk_aiq_tone_map_level_dynamic,          /*!< Force dynamic calculation of TM LUT */
+} rk_aiq_tone_map_level;
+
+/*!
+ * \brief Results from GBCE.
+ */
+typedef struct {
+    float* r_gamma_lut;             /*!< Gamma LUT for R channel. Range [0.0, 1.0]. */
+    float* b_gamma_lut;             /*!< Gamma LUT for B channel. Range [0.0, 1.0]. */
+    float* g_gamma_lut;             /*!< Gamma LUT for G channel. Range [0.0, 1.0]. */
+    unsigned int gamma_lut_size;    /*!< Number of elements in each gamma LUT. */
+    float* tone_map_lut;            /*!< Tone Mapping Gain LUT. Range [0.0 FLT_MAX] */
+    unsigned int tone_map_lut_size; /*!< Number of elements in tone mapping LUT. */
+} rk_aiq_gbce_results;
+
+/*!
  * \brief Values used in various operations for each color channels.
  * Value range depends on algorithm output.
  */
@@ -371,535 +663,116 @@ typedef struct
     float gb;               /*!< A value affecting Gb color channel. */
 } rk_aiq_color_channels;
 
-/*----------------------- AIQ related end ---------------------*/
-
-/*----------------------- ISP sub modules related start ---------------------*/
-
-typedef struct
-{
-    unsigned short lsc_r_data_tbl[RK_AIQ_LSC_DATA_TBL_SIZE];
-    unsigned short lsc_gr_data_tbl[RK_AIQ_LSC_DATA_TBL_SIZE];
-    unsigned short lsc_gb_data_tbl[RK_AIQ_LSC_DATA_TBL_SIZE];
-    unsigned short lsc_b_data_tbl[RK_AIQ_LSC_DATA_TBL_SIZE];
-    unsigned short lsc_data_tbl_cnt;
-
-    unsigned short lsc_x_grad_tbl[RK_AIQ_LSC_GRAD_TBL_SIZE];
-    unsigned short lsc_y_grad_tbl[RK_AIQ_LSC_GRAD_TBL_SIZE];
-    unsigned short lsc_grad_tbl_cnt;
-    unsigned short lsc_x_size_tbl[RK_AIQ_LSC_SIZE_TBL_SIZE];
-    unsigned short lsc_y_size_tbl[RK_AIQ_LSC_SIZE_TBL_SIZE];
-    unsigned short lsc_size_tbl_cnt;
-} rk_aiq_isp_lsc_config;
-
-typedef struct
-{
-    bool enabled;
-    unsigned short config_width;
-    unsigned short config_height;
-    rk_aiq_isp_lsc_config lsc_config;
-} rk_aiq_lsc_config;
-
-typedef struct
-{
-    unsigned short red;
-    unsigned short green;
-    unsigned short blue;
-} rk_aiq_xtalk_offset;
-
-typedef enum
-{
-    RK_ISP_AWB_MEASURING_MODE_INVALID,
-    RK_ISP_AWB_MEASURING_MODE_RGB,
-    RK_ISP_AWB_MEASURING_MODE_YCBCR,
-    RK_ISP_AWB_MEASURING_MODE_MAX,
-} rk_aiq_isp_awb_measure_mode;
-
-typedef struct
-{
-    unsigned char max_y;
-    unsigned char ref_cr_max_r;
-    unsigned char min_y_max_g;
-    unsigned char ref_cb_max_b;
-    unsigned char max_c_sum;
-    unsigned char min_c;
-} rk_aiq_isp_awb_measure_config;
-
-typedef struct
-{
-    unsigned int num_white_pixel;
-    unsigned char mean_y__g;
-    unsigned char mean_cb__b;
-    unsigned char mean_cr__r;
-} rk_aiq_awb_meas_val;
-
-typedef struct
-{
-    rk_aiq_awb_meas_val awb_meas[RK_AIQ_AWB_MAX_GRID];
-} rk_aiq_awb_measure_result;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_isp_awb_measure_mode awb_meas_mode;
-    rk_aiq_isp_awb_measure_config awb_meas_cfg;
-    rk_aiq_window awb_win;
-} rk_aiq_awb_measure_config;
-
-typedef struct
-{
-    unsigned short red_gain;
-    unsigned short green_r_gain;
-    unsigned short green_b_gain;
-    unsigned short blue_gain;
-} rk_aiq_gains;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_gains awb_gains;
-} rk_aiq_awb_gain_config;
-
-typedef enum
-{
-    RK_AIQ_COLOR_COMPONENT_RED,
-    RK_AIQ_COLOR_COMPONENT_GREENR,
-    RK_AIQ_COLOR_COMPONENT_GREENB,
-    RK_AIQ_COLOR_COMPONENT_BLUE,
-    RK_AIQ_COLOR_COMPONENT_MAX,
-} rk_aiq_color_comp;
-
-typedef struct
-{
-    bool enabled;
-    unsigned short isp_bls_a_fixed;
-    unsigned short isp_bls_b_fixed;
-    unsigned short isp_bls_c_fixed;
-    unsigned short isp_bls_d_fixed;
-    unsigned char num_win;
-    rk_aiq_window window1;
-    rk_aiq_window window2;
-} rk_aiq_bls_config;
-
-typedef struct
-{
-    bool enabled;
-    unsigned int isp_dpcc_mode;
-    unsigned int isp_dpcc_output_mode;
-    unsigned int isp_dpcc_set_use;
-
-    unsigned int isp_dpcc_methods_set_1;
-    unsigned int isp_dpcc_methods_set_2;
-    unsigned int isp_dpcc_methods_set_3;
-
-    unsigned int isp_dpcc_line_thresh_1;
-    unsigned int isp_dpcc_line_mad_fac_1;
-    unsigned int isp_dpcc_pg_fac_1;
-    unsigned int isp_dpcc_rnd_thresh_1;
-    unsigned int isp_dpcc_rg_fac_1;
-
-    unsigned int isp_dpcc_line_thresh_2;
-    unsigned int isp_dpcc_line_mad_fac_2;
-    unsigned int isp_dpcc_pg_fac_2;
-    unsigned int isp_dpcc_rnd_thresh_2;
-    unsigned int isp_dpcc_rg_fac_2;
-
-    unsigned int isp_dpcc_line_thresh_3;
-    unsigned int isp_dpcc_line_mad_fac_3;
-    unsigned int isp_dpcc_pg_fac_3;
-    unsigned int isp_dpcc_rnd_thresh_3;
-    unsigned int isp_dpcc_rg_fac_3;
-
-    unsigned int isp_dpcc_ro_limits;
-    unsigned int isp_dpcc_rnd_offs;
-} rk_aiq_dpcc_config;
-
-typedef enum
-{
-    RK_ISP_FLT_STATIC_MODE,
-    RK_ISP_FLT_DYNAMIC_MODE,
-} rk_aiq_flt_mode;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_flt_mode mode;
-    unsigned char grn_stage1;
-    unsigned char chr_h_mode;
-    unsigned char chr_v_mode;
-    unsigned int thresh_bl0;
-    unsigned int thresh_bl1;
-    unsigned int thresh_sh0;
-    unsigned int thresh_sh1;
-    unsigned int lum_weight;
-    unsigned int fac_sh1;
-    unsigned int fac_sh0;
-    unsigned int fac_mid;
-    unsigned int fac_bl0;
-    unsigned int fac_bl1;
-    int denoise_level;
-    int sharp_level;
-} rk_aiq_flt_config;
-
-typedef struct
-{
-    unsigned short gamma_y[RK_AIQ_GAMMA_OUT_MAX_SAMPLES];
-    unsigned char gamma_y_cnt;
-} rk_aiq_gamma_curve;
-
-typedef enum
-{
-    RK_ISP_SEGMENTATION_MODE_INVALID = -1,
-    RK_ISP_SEGMENTATION_MODE_LOGARITHMIC,
-    RK_ISP_SEGMENTATION_MODE_EQUIDISTANT,
-    RK_ISP_SEGMENTATION_MODE_MAX,
-} rk_aiq_gamma_seg_mode;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_gamma_seg_mode mode;
-    rk_aiq_gamma_curve gamma_y;
-} rk_aiq_goc_config;
-
-typedef struct
-{
-    bool enabled;
-    /* segment array size, always equal red,green or blue array size + 1 */
-    unsigned char seg_size;
-    unsigned char segment[RK_AIQ_DEGAMMA_CURVE_SIZE - 1];
-    unsigned short red[RK_AIQ_DEGAMMA_CURVE_SIZE];
-    unsigned short green[RK_AIQ_DEGAMMA_CURVE_SIZE];
-    unsigned short blue[RK_AIQ_DEGAMMA_CURVE_SIZE];
-} rk_aiq_sdg_config;
-
-typedef enum
-{
-    RK_ISP_QUANTIZATION_RANGE_OUT_INVALID,
-    RK_ISP_QUANTIZATION_RANGE_OUT_BT601,
-    RK_ISP_QUANTIZATION_RANGE_OUT_FULL_RANGE,
-    RK_ISP_QUANTIZATION_RANGE_OUT_MAX,
-} rk_aiq_isp_quantization_range;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_isp_quantization_range ChromaOut;
-    rk_aiq_isp_quantization_range LumaOut;
-    rk_aiq_isp_quantization_range LumaIn;
-
-    unsigned char contrast;
-    unsigned char brightness;
-    unsigned char saturation;
-    unsigned char hue;
-} rk_aiq_cproc_config;
-
-typedef enum
-{
-    RK_ISP_ECM_MODE_INVALID,
-    RK_ISP_ECM_MODE_1,
-    RK_ISP_ECM_MODE_2,
-    RK_ISP_ISP_ECM_MODE_MAX,
-} rk_aiq_isp_ecm_mode;
-
-typedef enum
-{
-    RK_ISP_EXP_MEASURING_MODE_INVALID = -1,
-    RK_ISP_EXP_MEASURING_MODE_0,
-    RK_ISP_EXP_MEASURING_MODE_1,
-    RK_ISP_EXP_MEASURING_MODE_MAX,
-} rk_aiq_isp_exp_measure_mode;
-
-typedef enum
-{
-    RK_ISP_HIST_MODE_INVALID,
-    RK_ISP_HIST_MODE_RGB_COMBINED,
-    RK_ISP_HIST_MODE_R,
-    RK_ISP_HIST_MODE_G,
-    RK_ISP_HIST_MODE_B,
-    RK_ISP_HIST_MODE_Y,
-    RK_ISP_HIST_MODE_MAX,
-} rk_aiq_isp_hist_mode;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_isp_hist_mode mode;
-    unsigned short stepSize;
-    rk_aiq_window window;
-    unsigned char weights[RK_AIQ_HISTOGRAM_WEIGHT_GRIDS_SIZE];
-    unsigned char weights_cnt;
-} rk_aiq_hist_config;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_window win;
-    rk_aiq_isp_exp_measure_mode mode;
-} rk_aiq_aec_config;
-
-typedef struct
-{
-    unsigned char exp_mean[RK_AIQ_AE_MEAN_MAX];
-    unsigned char exp_mean_cnt;
-    unsigned int hist_bin[RK_AIQ_HIST_BIN_N_MAX];
-    unsigned char hist_bin_cnt;
-} rk_aiq_aec_measure_result;
-
-typedef enum
-{
-    RK_ISP_IE_MODE_INVALID,
-    RK_ISP_IE_MODE_GRAYSCALE,
-    RK_ISP_IE_MODE_NEGATIVE,
-    RK_ISP_IE_MODE_SEPIA,
-    RK_ISP_IE_MODE_COLOR,
-    RK_ISP_IE_MODE_EMBOSS,
-    RK_ISP_IE_MODE_SKETCH,
-    RK_ISP_IE_MODE_SHARPEN,
-    RK_ISP_IE_MODE_MAX,
-} rk_aiq_isp_ie_mode;
-
-typedef enum
-{
-    RK_ISP_IE_COLOR_SELECTION_INVALID,
-    RK_ISP_IE_COLOR_SELECTION_RGB,
-    RK_ISP_IE_COLOR_SELECTION_B,
-    RK_ISP_IE_COLOR_SELECTION_G,
-    RK_ISP_IE_COLOR_SELECTION_GB,
-    RK_ISP_IE_COLOR_SELECTION_R,
-    RK_ISP_IE_COLOR_SELECTION_RB,
-    RK_ISP_IE_COLOR_SELECTION_RG,
-    RK_ISP_IE_COLOR_SELECTION_MAX,
-} rk_aiq_isp_ie_color_sel;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_isp_ie_mode mode;
-    rk_aiq_isp_quantization_range range;
-
-    union mode_config_u {
-        struct
-        {
-            unsigned char tint_cb;
-            unsigned char tint_Cr;
-        } sepia;
-
-        struct
-        {
-            rk_aiq_isp_ie_color_sel col_selection;
-            unsigned char col_threshold;
-        } color_selection;
-
-        struct
-        {
-            int8_t coeff[9];
-        } emboss;
-
-        struct
-        {
-            int8_t coeff[9];
-        } sketch;
-
-        struct
-        {
-            unsigned char factor;
-            unsigned char threshold;
-            char coeff[9];
-        } sharpen;
-
-    } mode_config;
-
-} rk_aiq_ie_config;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_3x3Matrix ctk_matrix;
-    rk_aiq_xtalk_offset cc_offset;
-} rk_aiq_ctk_config;
-
-typedef struct
-{
-    bool enabled;
-    unsigned char demosaic_th;
-} rk_aiq_bdm_config;
-
-typedef enum
-{
-    RK_ISP_WDR_MODE_GLOBAL,
-    RK_ISP_WDR_MODE_BLOCK
-} rk_aiq_isp_wdr_mode;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_isp_wdr_mode mode;
-    unsigned char segment[RK_AIQ_WDR_MAX_CURVE_SIZE - 1];
-    unsigned char segment_cnt;
-    unsigned short wdr_global_y[RK_AIQ_WDR_MAX_CURVE_SIZE];
-    unsigned short wdr_block_y[RK_AIQ_WDR_MAX_CURVE_SIZE];;
-    unsigned short wdr_noiseratio;
-    unsigned short wdr_bestlight;
-    unsigned int wdr_gain_off1;
-    unsigned short wdr_pym_cc;
-    unsigned char wdr_epsilon;
-    unsigned char wdr_lvl_en;
-    unsigned char wdr_flt_sel;
-    unsigned char wdr_gain_max_clip_enable;
-    unsigned char wdr_gain_max_value;
-    unsigned char wdr_bavg_clip;
-    unsigned char wdr_nonl_segm;
-    unsigned char wdr_nonl_open;
-    unsigned char wdr_nonl_mode1;
-    unsigned int wdr_coe0;
-    unsigned int wdr_coe1;
-    unsigned int wdr_coe2;
-    unsigned int wdr_coe_off;
-} rk_aiq_isp_wdr_config;
-
-typedef struct
-{
-    unsigned char weight_r;
-    unsigned char weight_g;
-    unsigned char weight_b;
-} rk_aiq_isp_dpf_inv_strength;
-
-/* dpf noise level lookup scale */
-typedef enum
-{
-    RK_AIQ_ISP_DPF_NLL_SCALE_INVALID = -1,             /**< lower border (only for an internal evaluation) */
-    RK_AIQ_ISP_DPF_NLL_SCALE_LINEAR,                   /**< use a linear scaling */
-    RK_AIQ_ISP_DPF_NLL_SCALE_LOGARITHMIC,              /**< use a logarithmic scaling */
-    RK_AIQ_ISP_DPF_NLL_SCALE_MAX,                      /**< upper border (only for an internal evaluation) */
-} rk_aiq_isp_dpf_nll_scale;
-
-typedef struct
-{
-    unsigned short nll_coeff[RK_AIQ_DPF_MAX_NLF_COEFFS];  /**< Noise-Level-Lookup coefficients */
-    unsigned char nll_coeff_size;
-    rk_aiq_isp_dpf_nll_scale x_scale;                         /**< type of x-axis (logarithmic or linear type) */
-} rk_aiq_isp_dpf_noise_level_lookup;
-
-typedef struct
-{
-    unsigned char weight_coeff[RK_AIQ_DPF_MAX_SPATIAL_COEFFS];
-    unsigned char weight_coeff_size;
-} rk_aiq_isp_dpf_spatial;
-
-typedef enum
-{
-    RK_AIQ_ISP_DPF_GAIN_USAGE_INVALID,             /**< lower border (only for an internal evaluation) */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_DISABLED,            /**< don't use any gains in preprocessing stage */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_NF_GAINS,            /**< use only the noise function gains  from registers DPF_NF_GAIN_R, ... */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_LSC_GAINS,           /**< use only the gains from LSC module */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_NF_LSC_GAINS,        /**< use the moise function gains and the gains from LSC module */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_AWB_GAINS,           /**< use only the gains from AWB module */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_AWB_LSC_GAINS,       /**< use the gains from AWB and LSC module */
-    RK_AIQ_ISP_DPF_GAIN_USAGE_MAX,                 /**< upper border (only for an internal evaluation) */
-} rk_aiq_isp_dpf_gain_usage;
-
-typedef enum
-{
-    RK_AIQ_ISP_DPF_RB_FILTERSIZE_INVALID = -1,     /**< lower border (only for an internal evaluation) */
-    RK_AIQ_ISP_DPF_RB_FILTERSIZE_9x9,              /**< red and blue filter kernel size 9x9 (means 5x5 active pixel) */
-    RK_AIQ_ISP_DPF_RB_FILTERSIZE_13x9,             /**< red and blue filter kernel size 13x9 (means 7x5 active pixel) */
-    RK_AIQ_ISP_DPF_RB_FILTERSIZE_MAX,              /**< upper border (only for an internal evaluation) */
-} rk_aiq_isp_dpf_rb_flt_size;
-
-typedef struct
-{
-    bool enabled;
-    rk_aiq_gains nf_ains;
-    rk_aiq_isp_dpf_noise_level_lookup lookup;
-    rk_aiq_isp_dpf_gain_usage gain_usage;
-    rk_aiq_isp_dpf_rb_flt_size rb_flt_size;
-    rk_aiq_isp_dpf_spatial spatial_g;
-    rk_aiq_isp_dpf_spatial spatial_rb;
-    bool process_red_pixel;
-    bool process_blue_pixel;
-    bool process_gr_pixel;
-    bool process_gb_pixel;
-} rk_aiq_dpf_config;
-
-typedef struct
-{
-    bool enabled;
-    unsigned char r;
-    unsigned char g;
-    unsigned char b;
-} rk_aiq_dpf_strength_config;
-/*----------------------- ISP sub modules related end ---------------------*/
-
-/*------------------------ algorithm result start ------------------------------- */
-
 /*!
- * \brief AEC results.
+ * \brief LUTs for each color channel.
  */
 typedef struct
 {
-    rk_aiq_exposure_parameters exposure;
-    rk_aiq_exposure_sensor_parameters sensor_exposure;
-    bool converged;
-    rk_aiq_ae_flicker_reduction flicker_reduction_mode; /*!< Flicker reduction mode proposed by the AEC algorithm */
-    rk_aiq_aec_config aec_config_result;
-    rk_aiq_hist_config hist_config_result;
-    /* TODO: add flash params, hdr params */
-} rk_aiq_ae_results;
+    float *gr;              /*!< LUT for Gr color channel. Range [0.0, 1.0].*/
+    float *r;               /*!< LUT for R color channel. Range [0.0, 1.0]. */
+    float *b;               /*!< LUT for B color channel. Range [0.0, 1.0]. */
+    float *gb;              /*!< LUT for Gb color channel. Range [0.0, 1.0]. */
+    unsigned int size;      /*!< Number of elements in each LUT. */
+} rk_aiq_color_channels_lut;
 
 /*!
- * \brief Results from AWB.
+* \brief Advanced Color Correction Matrix Structure Returned by Parameter Adaptor.
+*/
+typedef struct {
+    unsigned int sector_count;                                  /*!< Number of color matrix sectors.  */
+    unsigned int *hue_of_sectors;                               /*!< Starting hues of sectors. */
+    float (*advanced_color_conversion_matrices)[3][3];          /*!< Advanced CC matrices. Array of color matrices. Each color matrix optimized using a certain sector. Array size is sector_count*/
+}
+rk_aiq_advanced_ccm_t;
+
+
+
+/*!
+* \brief IR Weight Grid.
+*/
+typedef struct {
+    unsigned int width;                 /*!< IR Weight grid width */
+    unsigned int height;                /*!< IR Weight grid height */
+    unsigned short *ir_weight_grid_R;          /*!< Interpolated IR Weight for R channel */
+    unsigned short *ir_weight_grid_G;          /*!< Interpolated IR Weight for G channel */
+    unsigned short *ir_weight_grid_B;          /*!< Interpolated IR Weight for B channel */
+}
+rk_aiq_ir_weight_t;
+
+/*!
+ * \brief Shading Adaptor results.
+ */
+typedef struct {
+    float *channel_gr;                                /*!< Pointer to the LSC table for Gr color channel. */
+    float *channel_r;                                 /*!< Pointer to the LSC table for R color channel. */
+    float *channel_b;                                 /*!< Pointer to the LSC table for B color channel. */
+    float *channel_gb;                                /*!< Pointer to the LSC table for Gb color channel. */
+    unsigned short width;                             /*!< Width of LSC table. */
+    unsigned short height;                            /*!< Height of LSC table. */
+    bool lsc_update;                                  /*!< Indicates if LSC table has been modified and shall be updated in ISP. false - no change, true - new LSC. */
+    float scene_difficulty;                           /*!< Weighted cumulative confidence within selected patches (normalized against num_patches). */
+    unsigned short num_patches;                       /*!< Number of patches that were used to make decision. */
+    float covered_area;                               /*!< Statistics area covered by selected patches (%). */
+    rk_aiq_frame_params frame_params;                 /*!< Frame parameters that describe cropped area size and its position under LSC grid. */
+} rk_aiq_sa_results; /* rk_aiq_sa_results owns lsc_grid */
+
+/*!
+ * \brief Results from Parameter Adaptor.
+ */
+typedef struct {
+    float color_conversion_matrix[MAX_COLOR_CONVERSION_MATRIX][MAX_COLOR_CONVERSION_MATRIX]; /*!< CC matrix. */
+    rk_aiq_color_channels black_level;                /*!< Black level coefficients of each Bayer channel (absolute level). */
+    rk_aiq_color_channels color_gains;                /*!< RGB gains for each color channels including given (in rk_aiq_pa_input_params) color gains and gains calculated from AWB results. */
+    rk_aiq_color_channels_lut linearization;          /*!< LUTs for linearization of each color channel after black level correction. */
+    float saturation_factor;                          /*!< Saturation factor to increase/decrease saturation.*/
+    float brightness_level;                           /*!< Range [0.0, 1.0]. Indicates level of brightness in the image. */
+    rk_aiq_advanced_ccm_t *preferred_acm;             /*!< Advanced CC matrix. */
+    rk_aiq_ir_weight_t *ir_weight;                    /*!< IR Weight. */
+} rk_aiq_pa_results;
+
+/*!
+ * \brief Autofocus bracketing results
  */
 typedef struct
 {
-    rk_aiq_awb_measure_config awb_meas_cfg;
-    rk_aiq_awb_gain_config awb_gain_cfg;
-    rk_aiq_ctk_config ctk_config;
-    rk_aiq_lsc_config lsc_cfg;
-    bool converged;
-} rk_aiq_awb_results;
+    unsigned short *distances_bracketing;             /*!< Ordered array of distances in mm for focus bracketing. Distances are ordered from Infinity to close up.*/
+    int *lens_positions_bracketing;                   /*!< Ordered array of lens positions for focus bracketing. Order is from FAR and to NEAR end. */
+} rk_aiq_af_bracket_results;
 
 /*!
- * \brief Autofocus algorithm results
+ * \brief Accelerometer Events
+ *        Gravity Events
+ *        Gyroscope Events
  */
 typedef struct
 {
-    rk_aiq_afc_cfg afc_config;
-    rk_aiq_af_status status;                           /*!< Focus status */
-    unsigned short current_focus_distance;             /*!< Current focusing distance in mm */
-    int next_lens_position;                            /*!< Next lens position */
-    bool final_lens_position_reached;                  /*!< Lens has reached the final lens position */
-} rk_aiq_af_results;
+    unsigned long long ts;  /*!< Time stamp in usec (microseconds) */
+    float x;                /*!< Sensor Data in X direction depending on the type of the sensor */
+    float y;                /*!< Sensor Data in Y direction depending on the type of the sensor */
+    float z;                /*!< Sensor Data in Z direction depending on the type of the sensor */
+    float sensitivity;      /*!< Sensitivity of the sensor */
+    unsigned long long fs;  /*!< Frame stamp in usec (microseconds) */
+} rk_aiq_sensor_data;
 
+
+/* TODO: Update the structure according to the API */
 /*!
- * \brief Results from GBCE.
+ * \brief Ambient Light EventsLIGHT_AMBIENTLIGHT
+ * NOTE: This should always match to libsensorhub API
  */
 typedef struct
 {
-    rk_aiq_cproc_config cproc_config;
-    rk_aiq_goc_config goc_config;
-    rk_aiq_ie_config ie_config;
-} rk_aiq_gbce_results;
+    unsigned long long ts;  /*!< Time stamp in usec (microseconds) */
+    float data;             /*!< Ambient Light data ? */
+    float sensitivity;      /*!< Sensitivity of Ambient Light sensor */
+    unsigned long long fs;  /*!< Frame stamp in usec (microseconds) */
+} rk_aiq_ambient_light_events;
 
-/*!
- * \brief Results from MISC.
- */
-typedef struct
-{
-    rk_aiq_bls_config bls_config;
-    rk_aiq_dpcc_config dpcc_config;
-    rk_aiq_flt_config flt_config;
-    rk_aiq_bdm_config bdm_config;
-    rk_aiq_gbce_results gbce_config;
-    rk_aiq_dpf_config dpf_config;
-    rk_aiq_dpf_strength_config strength_config;
-    rk_aiq_isp_wdr_config wdr_config;
-    rk_aiq_sdg_config sdg_config;
-} rk_aiq_misc_isp_results;
-
-/*------------------------ algorithm result end ------------------------------- */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //__RK_AIQ_TYPES_H__
+#endif /* _IA_AIQ_TYPES_H_ */
+
+

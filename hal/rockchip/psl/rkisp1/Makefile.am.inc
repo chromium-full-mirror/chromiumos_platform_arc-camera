@@ -56,8 +56,7 @@ PSLCPPFLAGS = \
     -I$(top_srcdir)/include/ia_imaging \
     -I$(top_srcdir)/include/rk_imaging \
     -DCAMERA_RKISP1_SUPPORT \
-    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F \
-    -DUSED_FAKE_INPUTSYS
+    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F
 
 if REMOTE_3A_SERVER
 PSLCPPFLAGS += \

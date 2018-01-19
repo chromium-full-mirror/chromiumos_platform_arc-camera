@@ -50,7 +50,6 @@ public:
     const char* getSensorName(void) const { return mSensorName.c_str(); };
     const ia_binary_data getNvmData(void) const { return mNvmData; };
     const std::string& getGraphSettingsFile(void) const { return mGraphSettingsFile; };
-    const std::string& getIqTuningFile(void) const { return mIqTuningFile; };
 
     const std::string getMediaCtlEntityName(std::string type) const;
     const std::vector<std::string> getMediaCtlEntityNames(std::string type) const;
@@ -72,7 +71,7 @@ public:
     std::string mSensorName;
     ia_binary_data mNvmData;
     std::string mGraphSettingsFile;
-    std::string mIqTuningFile;
+
 private:
     friend class PSLConfParser;
     std::vector<MediaCtlElement> mMediaCtlElements;

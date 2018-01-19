@@ -27,6 +27,7 @@
 
 const char* STATISTICS = "3a statistics";
 const char* PARAMS = "parameters";
+const char* IMGU_NAME = "rkisp1-imgu";
 
 namespace android {
 namespace camera2 {
@@ -57,8 +58,6 @@ status_t MediaCtlHelper::configure(IStreamConfigProvider &graphConfigMgr, IStrea
         LOGE("%d is type for pipe!", type);
         return BAD_VALUE;
     }
-
-    LOG1("%s: in ,type %s", __FUNCTION__, (type == IStreamConfigProvider::CIO2) ? "CIO2" : "IMGU");
 
     std::shared_ptr<GraphConfig> gc = graphConfigMgr.getBaseGraphConfig();
     media_device_info deviceInfo;
@@ -135,18 +134,8 @@ status_t MediaCtlHelper::configure(IStreamConfigProvider &graphConfigMgr, IStrea
     // setting all the format necessary for the media controller entities
     for (unsigned int i = 0; i < mMediaCtlConfig->mFormatParams.size(); i++) {
         MediaCtlFormatParams pipeFormat = mMediaCtlConfig->mFormatParams[i];
-        std::shared_ptr<MediaEntity> entity = nullptr;
-        status = mMediaCtl->getMediaEntity(entity, pipeFormat.entityName.c_str());
-        if (status != NO_ERROR) {
-            LOGE("Getting MediaEntity \"%s\" failed", pipeFormat.entityName.c_str());
-            return status;
-        }
         pipeFormat.field = 0;
-        //TODO: need align, zyc ?
-        if (entity->getType() == DEVICE_VIDEO)
-            pipeFormat.stride = widthToStride(pipeFormat.formatCode, pipeFormat.width);
-        else
-            pipeFormat.stride = pipeFormat.width;
+        pipeFormat.stride = widthToStride(pipeFormat.formatCode, pipeFormat.width);
 
         status = mMediaCtl->setFormat(pipeFormat);
         if (status != NO_ERROR) {
@@ -155,23 +144,18 @@ status_t MediaCtlHelper::configure(IStreamConfigProvider &graphConfigMgr, IStrea
         }
 
         // get the capture pipe output format
+        std::shared_ptr<MediaEntity> entity = nullptr;
+        status = mMediaCtl->getMediaEntity(entity, pipeFormat.entityName.c_str());
+        if (status != NO_ERROR) {
+            LOGE("Getting MediaEntity \"%s\" failed", pipeFormat.entityName.c_str());
+            return status;
+        }
         if (entity->getType() == DEVICE_VIDEO) {
             mConfigResults.pixelFormat = pipeFormat.formatCode;
             LOG1("Capture pipe output format: %s",
                     v4l2Fmt2Str(mConfigResults.pixelFormat));
         }
     }
-
-    for (auto& it :mMediaCtlConfig->mSelectionParams) {
-        //TODO, only isp subdev can set selection params now ,zyc
-        if (it.entityName.find("isp-subdev") == string::npos)
-            continue;
-        status = mMediaCtl->setSelection(it.entityName.c_str(), it.pad, it.target, it.top, it.left, it.width, it.height);
-        if (status != NO_ERROR) {
-            LOGE("Cannot set subdev MediaCtl format selection (ret = %d)", status);
-            return status;
-        }
-     }
 
     // setting all the selections
     for (auto& it :mMediaCtlConfig->mSelectionVideoParams) {
@@ -189,9 +173,16 @@ status_t MediaCtlHelper::configure(IStreamConfigProvider &graphConfigMgr, IStrea
             return status;
         }
 
-        status = vNode->setSelection(it.select);
+        // set selection control to imgu node
+        status = mMediaCtl->setSelection(IMGU_NAME,
+                                       it.select.pad,
+                                       it.select.target,
+                                       it.select.r.top,
+                                       it.select.r.left,
+                                       it.select.r.width,
+                                       it.select.r.height);
         if (status != NO_ERROR) {
-            LOGE("Cannot set vnode MediaCtl format selection (ret = %d)", status);
+            LOGE("Cannot set MediaCtl format selection (ret = %d)", status);
             return status;
         }
      }

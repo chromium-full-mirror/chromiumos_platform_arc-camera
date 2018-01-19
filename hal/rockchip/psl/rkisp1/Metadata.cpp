@@ -70,28 +70,43 @@ Metadata::writeAwbMetadata(RequestCtrlState &reqState)
      /*
       * TODO: Consider moving this to common code in 3A class
       */
-     /* rk_aiq_pa_results &paResults = reqState.captureSettings->aiqResults.paResults; */
-     /* float gains[4]; */
-     /* gains[0] = paResults.color_gains.r; */
-     /* gains[1] = paResults.color_gains.gr; */
-     /* gains[2] = paResults.color_gains.gb; */
-     /* gains[3] = paResults.color_gains.b; */
-     /* reqState.ctrlUnitResult->update(ANDROID_COLOR_CORRECTION_GAINS, gains, 4); */
+     rk_aiq_pa_results &paResults = reqState.captureSettings->aiqResults.paResults;
+     float gains[4];
+     gains[0] = paResults.color_gains.r;
+     gains[1] = paResults.color_gains.gr;
+     gains[2] = paResults.color_gains.gb;
+     gains[3] = paResults.color_gains.b;
+     reqState.ctrlUnitResult->update(ANDROID_COLOR_CORRECTION_GAINS, gains, 4);
 
      /*
       * store the results in row major order
       */
-     /* camera_metadata_rational_t transformMatrix[9]; */
-     /* const int32_t COLOR_TRANSFORM_PRECISION = 10000; */
-     /* for (int i = 0; i < 3; i++) { */
-     /*     for (int j = 0; j < 3; j++) { */
-     /*         transformMatrix[j + 3*i].numerator = */
-     /*                 (int32_t)(paResults.color_conversion_matrix[i][j] * COLOR_TRANSFORM_PRECISION); */
-     /*         transformMatrix[j + 3*i].denominator = COLOR_TRANSFORM_PRECISION; */
-     /*     } */
-     /* } */
-     /* reqState.ctrlUnitResult->update(ANDROID_COLOR_CORRECTION_TRANSFORM, */
-     /*                                 transformMatrix, 9); */
+     camera_metadata_rational_t transformMatrix[9];
+     const int32_t COLOR_TRANSFORM_PRECISION = 10000;
+     for (int i = 0; i < 3; i++) {
+         for (int j = 0; j < 3; j++) {
+             transformMatrix[j + 3*i].numerator =
+                     (int32_t)(paResults.color_conversion_matrix[i][j] * COLOR_TRANSFORM_PRECISION);
+             transformMatrix[j + 3*i].denominator = COLOR_TRANSFORM_PRECISION;
+         }
+     }
+     reqState.ctrlUnitResult->update(ANDROID_COLOR_CORRECTION_TRANSFORM,
+                                     transformMatrix, 9);
+}
+
+void Metadata::writePAMetadata(RequestCtrlState &reqState)
+{
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    uint8_t blLock = 0;
+
+    if (reqState.blackLevelOff) {
+        blLock = ANDROID_BLACK_LEVEL_LOCK_OFF;
+        reqState.ctrlUnitResult->update(ANDROID_BLACK_LEVEL_LOCK, &blLock, 1);
+    } else {
+        blLock = reqState.aiqInputParams.blackLevelLock ?
+                    ANDROID_BLACK_LEVEL_LOCK_ON : ANDROID_BLACK_LEVEL_LOCK_OFF;
+        reqState.ctrlUnitResult->update(ANDROID_BLACK_LEVEL_LOCK, &blLock, 1);
+    }
 }
 
 /**
@@ -226,7 +241,7 @@ void Metadata::writeSensorMetadata(RequestCtrlState &reqState)
     uint16_t pixels_per_line = 0;
     uint16_t lines_per_frame = 0;
     int64_t manualExpTime = 1;
-    rk_aiq_ae_results *AeExpResult = nullptr;
+    rk_aiq_ae_exposure_result *AeExpResult = nullptr;
 
     CLEAR(entry);
 
@@ -241,11 +256,15 @@ void Metadata::writeSensorMetadata(RequestCtrlState &reqState)
          * in the reqState.
          * It would be safer to take this from the embda once we have it
          */
-        AeExpResult = &reqState.captureSettings->aiqResults.aeResults;
+        AeExpResult = reqState.captureSettings->aiqResults.aeResults.exposures;
+        if (CC_UNLIKELY(AeExpResult == nullptr)) {
+            LOGW("AE exposure results are not present!");
+            return;
+        }
 
         // Calculate frame duration from AE results and sensor descriptor
-        pixels_per_line = AeExpResult->sensor_exposure.line_length_pixels;
-        lines_per_frame = AeExpResult->sensor_exposure.frame_length_lines;
+        pixels_per_line = AeExpResult[0].sensor_exposure->line_length_pixels;
+        lines_per_frame = AeExpResult[0].sensor_exposure->frame_length_lines;
 
         /*
          * Android wants the frame duration in nanoseconds
@@ -260,7 +279,7 @@ void Metadata::writeSensorMetadata(RequestCtrlState &reqState)
          * AE reports exposure in usecs but Android wants it in nsecs
          * In manual mode, use input value if delta to expResult is small.
          */
-        exposureTime = AeExpResult->exposure.exposure_time_us;
+        exposureTime = AeExpResult[0].exposure->exposure_time_us;
         rk_aiq_ae_input_params &inParams = reqState.aiqInputParams.aeInputParams;
 
         if (inParams.manual_exposure_time_us != nullptr)
@@ -326,6 +345,76 @@ Metadata::FillSensorDescriptor(const ControlUnit::Message &msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     mSensorDescriptor = msg.data.sensor.exposureDesc;
+}
+
+status_t Metadata::fillTonemapCurve(RequestCtrlState &reqState)
+{
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+
+    rk_aiq_gbce_results &gbceResults = reqState.captureSettings->aiqResults.gbceResults;
+
+    int multiplier = 1;
+    // TODO: apply the curves from request to gbce results
+    if (reqState.tonemapContrastCurve) {
+        if (reqState.rGammaLut != nullptr) {
+            reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_RED,
+                    reqState.rGammaLut,
+                    reqState.rGammaLutSize);
+        }
+        if (reqState.gGammaLut != nullptr) {
+            reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_GREEN,
+                    reqState.gGammaLut,
+                    reqState.gGammaLutSize);
+        }
+        if (reqState.bGammaLut != nullptr) {
+            reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_BLUE,
+                    reqState.bGammaLut,
+                    reqState.bGammaLutSize);
+        }
+    } else {
+        if (mMaxCurvePoints < gbceResults.gamma_lut_size && mMaxCurvePoints > 0) {
+            multiplier = gbceResults.gamma_lut_size / mMaxCurvePoints;
+            LOG2("Not enough curve points. Linear interpolation is used.");
+        } else {
+            mMaxCurvePoints = gbceResults.gamma_lut_size;
+        }
+
+        if (mRGammaLut == nullptr ||
+            mGGammaLut == nullptr ||
+            mBGammaLut == nullptr) {
+            LOGE("Lut tables are not initialized.");
+            return UNKNOWN_ERROR;
+        }
+
+        for (unsigned int i=0; i < mMaxCurvePoints; i++) {
+            mRGammaLut[i * 2 + 1] = gbceResults.r_gamma_lut[i * multiplier];
+            mGGammaLut[i * 2 + 1] = gbceResults.g_gamma_lut[i * multiplier];
+            mBGammaLut[i * 2 + 1] = gbceResults.b_gamma_lut[i * multiplier];
+        }
+        reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_RED,
+                mRGammaLut,
+                mMaxCurvePoints * 2);
+        reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_GREEN,
+                mGGammaLut,
+                mMaxCurvePoints * 2);
+        reqState.ctrlUnitResult->update(ANDROID_TONEMAP_CURVE_BLUE,
+                mBGammaLut,
+                mMaxCurvePoints * 2);
+    }
+
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_GAMMA_VALUE) {
+        reqState.ctrlUnitResult->update(ANDROID_TONEMAP_GAMMA,
+                &reqState.captureSettings->gammaValue,
+                1);
+    }
+
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_PRESET_CURVE) {
+        reqState.ctrlUnitResult->update(ANDROID_TONEMAP_PRESET_CURVE,
+                &reqState.captureSettings->presetCurve,
+                1);
+    }
+
+    return NO_ERROR;
 }
 
 } /* namespace camera2 */

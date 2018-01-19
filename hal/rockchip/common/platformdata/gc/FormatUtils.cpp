@@ -83,10 +83,6 @@ static const FormatInfo gFormatMapping[] = {
     { V4L2_PIX_FMT_SGBRG10P, 0, "V4L2_PIX_FMT_SGBRG10P", "GBRG10P", 10, FORMAT_RAW },
     { V4L2_PIX_FMT_SGRBG10P, 0, "V4L2_PIX_FMT_SGRBG10P", "GRBG10P", 10, FORMAT_RAW },
     { V4L2_PIX_FMT_SRGGB10P, 0, "V4L2_PIX_FMT_SRGGB10P", "RGGB10P", 10, FORMAT_RAW },
-    { V4L2_PIX_FMT_IPU3_SBGGR10, 0, "V4L2_PIX_FMT_IPU3_SBGGR10", "BGGR10", 16, FORMAT_RAW_VEC },
-    { V4L2_PIX_FMT_IPU3_SGBRG10, 0, "V4L2_PIX_FMT_IPU3_SGBRG10", "GBRG10", 16, FORMAT_RAW_VEC },
-    { V4L2_PIX_FMT_IPU3_SGRBG10, 0, "V4L2_PIX_FMT_IPU3_SGRBG10", "GRBG10", 16, FORMAT_RAW_VEC },
-    { V4L2_PIX_FMT_IPU3_SRGGB10, 0, "V4L2_PIX_FMT_IPU3_SRGGB10", "RGGB10", 16, FORMAT_RAW_VEC },
 
     { V4L2_PIX_FMT_NV16, 0, "V4L2_PIX_FMT_NV16", "NV16", 16, FORMAT_YUV },
     { V4L2_PIX_FMT_YUYV, 0, "V4L2_PIX_FMT_YUYV", "YUYV", 16, FORMAT_YUV },
@@ -101,7 +97,7 @@ static const FormatInfo gFormatMapping[] = {
     { V4L2_PIX_FMT_RGB565, 0, "V4L2_PIX_FMT_RGB565", "RGB565", 16, FORMAT_RGB },
 
     { V4L2_PIX_FMT_JPEG, 0, "V4L2_PIX_FMT_JPEG", "JPEG", 0, FORMAT_JPEG },
-    //add for rockchip,zyc
+
     { V4L2_MBUS_FMT_SBGGR12_1X12, 0, "V4L2_MBUS_FMT_SBGGR12_1X12", "SBGGR12_1X12", 12, FORMAT_MBUS_BAYER },
     { V4L2_MBUS_FMT_SGBRG12_1X12, 0, "V4L2_MBUS_FMT_SGBRG12_1X12", "SGBRG12_1X12", 12, FORMAT_MBUS_BAYER },
     { V4L2_MBUS_FMT_SGRBG12_1X12, 0, "V4L2_MBUS_FMT_SGRBG12_1X12", "SGRBG12_1X12", 12, FORMAT_MBUS_BAYER },
@@ -117,33 +113,7 @@ static const FormatInfo gFormatMapping[] = {
     { V4L2_MBUS_FMT_SGRBG8_1X8, 0, "V4L2_MBUS_FMT_SGRBG8_1X8", "SGRBG8_1X8", 8, FORMAT_MBUS_BAYER },
     { V4L2_MBUS_FMT_SRGGB8_1X8, 0, "V4L2_MBUS_FMT_SRGGB8_1X8", "SRGGB8_1X8", 8, FORMAT_MBUS_BAYER },
 
-    { V4L2_MBUS_FMT_YUYV8_1X16, 0, "V4L2_MBUS_FMT_YUYV8_1X16", "YUYV8_1X16", 16, FORMAT_MBUS_YUV },
-    { V4L2_PIX_FMT_SBGGR10, 0, "V4L2_PIX_FMT_SBGGR10", "BGGR10", 10, FORMAT_RAW },
-    { V4L2_PIX_FMT_SGBRG10, 0, "V4L2_PIX_FMT_SGBRG10", "GBRG10", 10, FORMAT_RAW },
-    { V4L2_PIX_FMT_SGRBG10, 0, "V4L2_PIX_FMT_SGRBG10", "GRBG10", 10, FORMAT_RAW },
-    { V4L2_PIX_FMT_SRGGB10, 0, "V4L2_PIX_FMT_SRGGB10", "RGGB10", 10, FORMAT_RAW },
-    { V4L2_PIX_FMT_NV12, 0, "V4L2_PIX_FMT_NV12", "NV12", 12, FORMAT_YUV },
-    { V4L2_PIX_FMT_NV21, 0, "V4L2_PIX_FMT_NV21", "NV21", 12, FORMAT_YUV },
-
-    { MEDIA_BUS_FMT_SBGGR12_1X12, 0, "MEDIA_BUS_FMT_SBGGR12_1X12", "SBGGR12_1X12", 12, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGBRG12_1X12, 0, "MEDIA_BUS_FMT_SGBRG12_1X12", "SGBRG12_1X12", 12, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGRBG12_1X12, 0, "MEDIA_BUS_FMT_SGRBG12_1X12", "SGRBG12_1X12", 12, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SRGGB12_1X12, 0, "MEDIA_BUS_FMT_SRGGB12_1X12", "SRGGB12_1X12", 12, FORMAT_MBUS_BAYER },
-
-    { MEDIA_BUS_FMT_SBGGR10_1X10, 0, "MEDIA_BUS_FMT_SBGGR10_1X10", "SBGGR10_1X10", 10, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGBRG10_1X10, 0, "MEDIA_BUS_FMT_SGBRG10_1X10", "SGBRG10_1X10", 10, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGRBG10_1X10, 0, "MEDIA_BUS_FMT_SGRBG10_1X10", "SGRBG10_1X10", 10, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SRGGB10_1X10, 0, "MEDIA_BUS_FMT_SRGGB10_1X10", "SRGGB10_1X10", 10, FORMAT_MBUS_BAYER },
-
-    { MEDIA_BUS_FMT_SBGGR8_1X8, 0, "MEDIA_BUS_FMT_SBGGR8_1X8", "SBGGR8_1X8", 8, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGBRG8_1X8, 0, "MEDIA_BUS_FMT_SGBRG8_1X8", "SGBRG8_1X8", 8, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SGRBG8_1X8, 0, "MEDIA_BUS_FMT_SGRBG8_1X8", "SGRBG8_1X8", 8, FORMAT_MBUS_BAYER },
-    { MEDIA_BUS_FMT_SRGGB8_1X8, 0, "MEDIA_BUS_FMT_SRGGB8_1X8", "SRGGB8_1X8", 8, FORMAT_MBUS_BAYER },
-
-    { MEDIA_BUS_FMT_YUYV8_1X16, 0, "MEDIA_BUS_FMT_YUYV8_1X16", "YUYV8_1X16", 16, FORMAT_MBUS_YUV },
-    { MEDIA_BUS_FMT_YVYU8_1X16, 0, "MEDIA_BUS_FMT_YVYU8_1X16", "YVYU8_1X16", 16, FORMAT_MBUS_YUV },
-    { MEDIA_BUS_FMT_YVYU8_1_5X8, 0, "MEDIA_BUS_FMT_YVYU8_1_5X8", "YVYU8_1_5X8", 12, FORMAT_MBUS_YUV },
-    { MEDIA_BUS_FMT_YUYV8_1_5X8, 0, "MEDIA_BUS_FMT_YUYV8_1_5X8", "YUYV8_1_5X8", 12, FORMAT_MBUS_YUV },
+    { V4L2_MBUS_FMT_YUYV8_1X16, 0, "V4L2_MBUS_FMT_YUYV8_1X16", "YUYV8_1X16", 16, FORMAT_MBUS_YUV }
 };
 
 const string pixelCode2String(int32_t code)
@@ -257,7 +227,6 @@ int32_t getMBusFormat(const std::string &bayerOrder, const int32_t bpp)
 
 int32_t getMBusFormat(int32_t commonPixelFormat)
 {
-#if 0
     for (size_t i = 0; i < ARRAY_SIZE(gFormatMapping); i++) {
         if (gFormatMapping[i].type == FORMAT_MBUS_BAYER ||
             gFormatMapping[i].type == FORMAT_MBUS_YUV ) {
@@ -265,25 +234,7 @@ int32_t getMBusFormat(int32_t commonPixelFormat)
                 return gFormatMapping[i].pixelCode;
         }
     }
-#else //commonPixelCode is now undefined now
-    if (commonPixelFormat == get_fourcc('R', 'G', '1', '0')) {
-        return MEDIA_BUS_FMT_SGBRG10_1X10;
-    } else if (commonPixelFormat == get_fourcc('B', 'G', '1', '0')) {
-        return MEDIA_BUS_FMT_SGRBG10_1X10;
-    } else if (commonPixelFormat == get_fourcc('G', 'R', '1', '0')) {
-        return MEDIA_BUS_FMT_SBGGR10_1X10;
-    } else if (commonPixelFormat == get_fourcc('G', 'B', '1', '0')) {
-        return MEDIA_BUS_FMT_SRGGB10_1X10;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '1', '2')) {
-        return MEDIA_BUS_FMT_YVYU8_1_5X8;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '2', '1')) {
-        return MEDIA_BUS_FMT_YUYV8_1_5X8;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '1', '6')) {
-        return MEDIA_BUS_FMT_YVYU8_1X16;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '6', '1')) {
-        return MEDIA_BUS_FMT_YUYV8_1X16;
-    }
-#endif
+
     LOGE("Failed to find any MBUS format with format %s",
             pixelCode2String(commonPixelFormat).c_str());
     return -1;
@@ -291,34 +242,11 @@ int32_t getMBusFormat(int32_t commonPixelFormat)
 
 int32_t getV4L2Format(const int32_t commonPixelFormat)
 {
-#if 0
     for (size_t i = 0; i < ARRAY_SIZE(gFormatMapping); i++) {
         if (gFormatMapping[i].commonPixelCode == commonPixelFormat)
             return gFormatMapping[i].pixelCode;
     }
-#else //commonPixelCode is now undefined now
-    if (commonPixelFormat == get_fourcc('R', 'G', '1', '0')) {
-        return V4L2_PIX_FMT_SGBRG10;
-    } else if (commonPixelFormat == get_fourcc('B', 'G', '1', '0')) {
-        return V4L2_PIX_FMT_SGRBG10;
-    } else if (commonPixelFormat == get_fourcc('G', 'R', '1', '0')) {
-        return V4L2_PIX_FMT_SBGGR10;
-    } else if (commonPixelFormat == get_fourcc('G', 'B', '1', '0')) {
-        return V4L2_PIX_FMT_SRGGB10;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '1', '2')) {
-        return V4L2_PIX_FMT_NV12;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '2', '1')) {
-        return V4L2_PIX_FMT_NV21;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '1', '6')) {
-        return V4L2_PIX_FMT_NV16;
-    } else if (commonPixelFormat == get_fourcc('N', 'V', '6', '1')) {
-        return V4L2_PIX_FMT_NV61;
-    } else if (commonPixelFormat == get_fourcc('Y', 'V', 'Y', 'U')) {
-        return V4L2_PIX_FMT_YVYU;
-    } else if (commonPixelFormat == get_fourcc('Y', 'U', 'Y', 'V')) {
-        return V4L2_PIX_FMT_YUYV;
-    }
-#endif
+
     LOGE("Failed to find any V4L2 format with format %s",
             pixelCode2String(commonPixelFormat).c_str());
     return -1;

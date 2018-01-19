@@ -51,21 +51,15 @@ BufferPools::~BufferPools()
  *  buffer pools will be assigned to
  */
 status_t BufferPools::createBufferPools(int numBufs, int numSkips,
-        std::shared_ptr<InputSystemBase> isys)
+        std::shared_ptr<InputSystem> isys)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    std::shared_ptr<V4L2VideoNode> node = nullptr;
-    int nodeCount = 0;
-    NodeTypes nodeType = IMGU_NODE_NULL;
-    InputSystem::ConfiguredNodesPerName *nodes = nullptr;
+    std::shared_ptr<V4L2VideoNode> node = isys->findOutputNode(ISYS_NODE_RAW);
     FrameInfo frameInfo;
+    status_t status = NO_ERROR;
 
-    status_t status = isys->getOutputNodes(&nodes, nodeCount);
-    if (status != NO_ERROR) {
-        LOGE("ISYS output nodes not configured");
-        return status;
-    }
-
+    CheckError((node.get() == nullptr), UNKNOWN_ERROR,
+        "@%s: create buffer pool failed", __FUNCTION__);
     mBufferPoolSize = numBufs + numSkips;
 
     /**
@@ -73,51 +67,34 @@ status_t BufferPools::createBufferPools(int numBufs, int numSkips,
      * V4L2 buffers that are registered to the V4L2 device.
      */
     mCaptureItemsPool.init(mBufferPoolSize);
+    node->getConfig(frameInfo);
+    V4L2Format aFormat;
+    node->getFormat(aFormat);
+    LOG1("@%s: creating capture buffer pool (size: %d) format: %s",
+        __FUNCTION__, mBufferPoolSize, v4l2Fmt2Str(frameInfo.format));
 
-    for (const auto &devNode : *nodes) {
-        nodeType = devNode.first;
-        node = devNode.second;
-
-        if (nodeType == ISYS_NODE_RAW) {
-            node->getConfig(frameInfo);
-            V4L2Format aFormat;
-            node->getFormat(aFormat);
-            LOG1("@%s: creating capture buffer pool (size: %d) format: %s",
-                    __FUNCTION__, mBufferPoolSize, v4l2Fmt2Str(frameInfo.format));
-        } else if (nodeType == IMGU_NODE_NULL) {
-            /* for fake isys*/
-            LOG1("fake isys node %d", nodeType);
-            frameInfo.format = V4L2_PIX_FMT_NV21;
-            frameInfo.width = 1;
-            frameInfo.height = 1;
-        } else {
-            LOGE("Unsupported ISYS node %d", nodeType);
+    std::vector<V4L2Buffer> v4l2Buffers;
+    for (unsigned int i = 0; i < mBufferPoolSize; i++) {
+        std::shared_ptr<CaptureBuffer> captureBufPtr = nullptr;
+        mCaptureItemsPool.acquireItem(captureBufPtr);
+        if (captureBufPtr.get() == nullptr) {
+            LOGE("Failed to get a capture buffer!");
             return UNKNOWN_ERROR;
         }
+        captureBufPtr->owner = this;
+        v4l2Buffers.push_back(captureBufPtr->v4l2Buf);
+    }
 
-        std::vector<V4L2Buffer> v4l2Buffers;
-        for (unsigned int i = 0; i < mBufferPoolSize; i++) {
-            std::shared_ptr<CaptureBuffer> captureBufPtr = nullptr;
-            mCaptureItemsPool.acquireItem(captureBufPtr);
-            if (captureBufPtr.get() == nullptr) {
-                LOGE("Failed to get a capture buffer!");
-                return UNKNOWN_ERROR;
-            }
-            captureBufPtr->owner = this;
-            v4l2Buffers.push_back(captureBufPtr->v4l2Buf);
-        }
+    status = isys->setBufferPool(ISYS_NODE_RAW, v4l2Buffers, true);
+    if (status != NO_ERROR) {
+        LOGE("Failed to set the capture buffer pool in ISYS status: 0x%X", status);
+        return status;
+    }
 
-        status = isys->setBufferPool(nodeType, v4l2Buffers, true);
-        if (status != NO_ERROR) {
-            LOGE("Failed to set the capture buffer pool in ISYS status: 0x%X", status);
-            return status;
-        }
-
-        status = allocateCaptureBuffers(node, frameInfo, numSkips, v4l2Buffers);
-        if (status != NO_ERROR) {
-            LOGE("Failed to allocate capture buffer in ISYS status: 0x%X", status);
-            return status;
-        }
+    status = allocateCaptureBuffers(node, frameInfo, numSkips, v4l2Buffers);
+    if (status != NO_ERROR) {
+        LOGE("Failed to allocate capture buffer in ISYS status: 0x%X", status);
+        return status;
     }
 
     return status;

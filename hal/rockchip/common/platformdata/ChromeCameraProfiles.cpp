@@ -22,7 +22,6 @@
 #include <sys/stat.h>
 #include <vector>
 #include <expat.h>
-#include <sys/stat.h>
 #include "Utils.h"
 #include "LogHelper.h"
 #include "PlatformData.h"

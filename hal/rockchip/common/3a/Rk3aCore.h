@@ -33,16 +33,108 @@
 #include "Rk3aAiq.h"
 
 NAMESPACE_DECLARATION {
+static const unsigned int NUM_EXPOSURES = 1;   /*!> Number of frames AIQ algorithm
+                                                    provides output for */
+static const unsigned int NUM_FLASH_LEDS = 1;   /*!> Number of leds AEC algorithm
+                                                    provides output for */
+#define MAX_STATISTICS_WIDTH 150
+#define MAX_STATISTICS_HEIGHT 150
+
+static const int UI_IMAGE_ENHANCEMENT_MAX = 10;
+static const float UI_IMAGE_ENHANCEMENT_STEPS = 20.0f;
+
+/**
+ * The result structures for 3A algorithm are full of pointers to other structs,
+ * some of those depends on the RGBS grid size or LSC grid size
+ * We should query those at init time and initialize the struct with the correct
+ * amount of memory. This is a TODO as an optimization
+ * for now we just allocate statically big values.
+ */
+static const unsigned int MAX_AE_GRID_SIZE = 2048; /*!> Top limit for  the RGBS grid size
+                                                        This is an upper limit to avoid dynamic allocation*/
+static const unsigned int DEFAULT_LSC_SIZE = 2048;
+static const unsigned int MAX_GAMMA_LUT_SIZE = 1024;
+static const unsigned int COLOR_CHANNEL_COUNT = 4;  // Bayer quad: R Gb Gr B
+static const unsigned int COLOR_MATRIX_ELEMENT_COUNT = 9;  // 3 x 3 matrix
+
+/**
+ *  Maker note maximum sizes
+ *  Section 1 is used for Normal capture
+ *  Section 2 is used for RAW captures
+ */
+static const unsigned int MAKERNOTE_SECTION1_SIZE = 56000;
+static const unsigned int MAKERNOTE_SECTION2_SIZE = 110592;
 
 /**
  * \struct AiqInputParams
  * The private structs are part of AE, AF and AWB input parameters.
+ * They need to separately be introduced to store the contents for
+ * the corresponding pointers.
  */
 struct AiqInputParams {
+    void init();
+    void reset();
+    AiqInputParams &operator=(const AiqInputParams &other);
+
     rk_aiq_ae_input_params  aeInputParams;
     rk_aiq_af_input_params  afParams;
     rk_aiq_awb_input_params awbParams;
-    rk_aiq_misc_isp_input_params miscParams;
+    rk_aiq_gbce_input_params gbceParams;
+    rk_aiq_pa_input_params paParams;
+    rk_aiq_sa_input_params saParams;
+    rk_aiq_dsd_input_params dsdParams;
+
+    /**
+     * We do not directly parse the AF region in the settings to the
+     * afParams focus_rectangle.
+     * The fillAfInputParams will output the AF region in this member.
+     * The reason is that not all HW platforms will implement touch AF
+     * by passing the focus rectangle to the AF algo. The current implementation
+     * assume that AF will get AF statistics covering the whole image.
+     * This is not always true.
+     * Some platforms modify the statistic collection parameters instead. So
+     * by modifying from where we get the statistics we can also achieve the
+     * effect of touch focus.
+     * It will be up to the PSL implementation to make use of the afRegion.
+     */
+    CameraWindow    afRegion;   /*!> AF region in IA_COORDINATE space parsed
+                                     from capture request settings */
+    bool aeLock;
+    bool awbLock;
+    bool blackLevelLock;
+    /*
+     * Manual color correction.
+     * This will be used to overwrite the results of PA
+     */
+    rk_aiq_color_channels manualColorGains;
+    float manualColorTransform[9];
+
+private:
+    /*!< rk_aiq_ae_input_params pointer contents */
+    rk_aiq_exposure_sensor_descriptor sensorDescriptor;
+    ia_rectangle exposureWindow;
+    ia_coordinate exposureCoordinate;
+    rk_aiq_ae_features aeFeatures;
+    rk_aiq_ae_manual_limits aeManualLimits;
+    long manual_exposure_time_us[NUM_EXPOSURES];
+    float manual_analog_gain[NUM_EXPOSURES];
+    short manual_iso[NUM_EXPOSURES];
+
+    /*!< rk_aiq_af_input_params pointer contents */
+    rk_aiq_manual_focus_parameters manualFocusParams;
+    ia_rectangle focusRect;
+
+    /*!< rk_aiq_awb_input_params pointer contents */
+    rk_aiq_awb_manual_cct_range manualCctRange;
+    ia_coordinate manualWhiteCoordinate;
+
+    /*!< rk_aiq_pa_input_params pointer contents */
+    rk_aiq_awb_results awbResults;
+    rk_aiq_color_channels colorGains;
+    rk_aiq_exposure_parameters exposureParams;
+
+    /*!< rk_aiq_sa_input_params pointer contents*/
+    rk_aiq_frame_params sensorFrameParams;
 };
 
 /**
@@ -52,12 +144,103 @@ struct AiqInputParams {
  * that the AIQ algorithms return as pointers.
  * Then we can do deep copy of the results
  */
-struct AiqResults {
+class AiqResults {
+public:
+    void init();
+    AiqResults();
+    ~AiqResults();
+    status_t allocateLsc(size_t lscSize);
+    AiqResults& operator=(const AiqResults& other);
+
+// Member variables
+public:
     int requestId;
     rk_aiq_ae_results aeResults;
     rk_aiq_awb_results awbResults;
     rk_aiq_af_results afResults;
-    rk_aiq_misc_isp_results miscIspResults;
+    rk_aiq_gbce_results gbceResults;
+    rk_aiq_scene_mode detectedSceneMode;
+    rk_aiq_pa_results paResults;
+    rk_aiq_sa_results saResults;
+
+private:
+    // prevent copy constructor and assignment operator
+    AiqResults(const AiqResults& other);
+
+private:
+    /*!< rk_aiq_ae_results pointer contents */
+    rk_aiq_ae_exposure_result mExposureResults;
+    rk_aiq_hist_weight_grid  mWeightGrid;
+    unsigned char mGrid[MAX_AE_GRID_SIZE];
+    rk_aiq_flash_parameters mFlashes[NUM_FLASH_LEDS];
+
+    /*!< rk_aiq_ae_exposure_result pointer contents */
+    rk_aiq_exposure_parameters        mGenericExposure;
+    rk_aiq_exposure_sensor_parameters mSensorExposure;
+
+    /*!< rk_aiq_gbce results */
+    /* The actual size of this table can be calculated by running cold
+     * GBCE, it will provide those tables. TODO!!
+     */
+    float mRGammaLut[MAX_GAMMA_LUT_SIZE];
+    float mGGgammaLut[MAX_GAMMA_LUT_SIZE];
+    float mBGammaLut[MAX_GAMMA_LUT_SIZE];
+
+    /*!< rk_aiq_sa_results pointer content */
+    float *mChannelR;
+    float *mChannelGR;
+    float *mChannelGB;
+    float *mChannelB;
+};
+
+struct SceneOverride {
+    uint8_t ae;
+    uint8_t awb;
+    uint8_t af;
+};
+
+struct AeInputParams {
+    rk_aiq_exposure_sensor_descriptor   *sensorDescriptor;
+    AiqInputParams                      *aiqInputParams;
+    AAAControls                         *aaaControls;
+    CameraWindow                        *croppingRegion;
+    CameraWindow                        *aeRegion;
+    int                                 extraEvShift;
+    int                                 maxSupportedFps;
+    AeInputParams()                     { CLEAR(*this); }
+};
+
+struct AwbInputParams {
+    AiqInputParams                      *aiqInputParams;
+    AAAControls                         *aaaControls;
+    AwbInputParams()                    { CLEAR(*this); }
+};
+
+struct PAInputParams {
+    AiqInputParams *aiqInputParams;
+    // non Aiq related fields can be put here if needed
+    PAInputParams() { CLEAR(*this); }
+};
+
+struct SAInputParams {
+    AiqInputParams *aiqInputParams;
+    // non Aiq related fields can be put here if needed
+    uint8_t saMode; /**< android sa mode */
+    uint8_t shadingMapMode; /**< android shading map mode */
+    SAInputParams() { CLEAR(*this); }
+};
+
+struct DsdInputParams {
+    AiqInputParams *aiqInputParams;
+    // non Aiq related fields can be put here if needed
+    rk_aiq_dsd_input_params aiqDsdInputParams;
+    DsdInputParams() : aiqInputParams(nullptr) { CLEAR(aiqDsdInputParams); }
+};
+
+struct AfInputParams {
+    AiqInputParams *aiqInputParams;
+    AfControls  *afControls;
+    AfInputParams() { CLEAR(*this); }
 };
 
 /**
@@ -71,11 +254,14 @@ struct AiqResults {
 class Rk3aCore {
 public:
     Rk3aCore(int camId);
-    status_t init(const char* xmlFilePath);
+    void enableAiqdDataSave(const bool enableAiqdDataSave = true);
+    status_t init(int maxGridW = MAX_STATISTICS_WIDTH,
+                     int maxGridH = MAX_STATISTICS_HEIGHT,
+                     ia_binary_data nvmData = {nullptr,0},
+                     const char* sensorName = nullptr);
     void deinit();
 
-    status_t setStatistics(rk_aiq_statistics_input_params *ispStatistics,
-                           rk_aiq_exposure_sensor_descriptor *sensor_desc);
+    status_t setStatistics(rk_aiq_statistics_input_params *ispStatistics);
 
     status_t runAe(rk_aiq_statistics_input_params *ispStatistics,
                    rk_aiq_ae_input_params *aeInputParams,
@@ -89,18 +275,74 @@ public:
                     rk_aiq_awb_input_params *awbInputParams,
                     rk_aiq_awb_results *awbResults);
 
-    status_t runMisc(rk_aiq_statistics_input_params  *ispStatistics,
-                     rk_aiq_misc_isp_input_params *miscInputParams,
-                     rk_aiq_misc_isp_results *miscResults);
+    status_t runGbce(rk_aiq_statistics_input_params *ispStatistics,
+                     rk_aiq_gbce_input_params *gbceInputParams,
+                     rk_aiq_gbce_results *gbceResults);
+
+    status_t runPa(rk_aiq_statistics_input_params *ispStatistics,
+                   rk_aiq_pa_input_params *paInputParams,
+                   rk_aiq_pa_results *paResults);
+
+    status_t runSa(rk_aiq_statistics_input_params *ispStatistics,
+                   rk_aiq_sa_input_params *saInputParams,
+                   rk_aiq_sa_results *saResults,
+                   bool forceUpdated = false);
+
+    status_t getMakerNote(ia_mkn_trg aTarget, ia_binary_data &aBlob);
+
+    class LSCGrid {
+    public: /* this was a struct: class just to satisfy a static code scanner */
+        uint16_t width;
+        uint16_t height;
+        float *gridR;
+        float *gridGr;
+        float *gridGb;
+        float *gridB;
+
+        bool isBad() const {
+            return (gridB == nullptr || gridGb == nullptr || gridR == nullptr ||
+                    gridGr == nullptr || width == 0 || height == 0);
+        }
+        LSCGrid(): width(0), height(0), gridR(nullptr), gridGr(nullptr),
+            gridGb(nullptr), gridB(nullptr) {}
+    };
+
+    /*
+     * static common operation
+     */
+    static status_t reFormatLensShadingMap(const LSCGrid &inputLscGrid,
+                                           float *dstLscGridRGGB);
+    static status_t storeLensShadingMap(const LSCGrid &inputLscGrid,
+                                        LSCGrid &resizeLscGrid,
+                                        float *dstLscGridRGGB);
+
+    static status_t deepCopyAiqResults(AiqResults &dst,
+                                       const AiqResults &src,
+                                       bool onlyCopyUpdatedSAResults = false);
+    static status_t deepCopyAEResults(rk_aiq_ae_results *dst, const rk_aiq_ae_results *src);
+    static status_t deepCopyGBCEResults(rk_aiq_gbce_results *dst,
+                                 const rk_aiq_gbce_results *src);
+    static status_t deepCopyPAResults(rk_aiq_pa_results *dst, const rk_aiq_pa_results *src);
+    static status_t deepCopySAResults(rk_aiq_sa_results *dst,
+                                      const rk_aiq_sa_results *src,
+                                      bool forceUpdated = false);
+
+    char mapUiImageEnhancement2Aiq(int uiValue);
 
 private:
     // prevent copy constructor and assignment operator
     Rk3aCore(const Rk3aCore& other);
     Rk3aCore& operator=(const Rk3aCore& other);
+    bool saveAiqdData();
+
+    status_t convertError(ia_err iaErr);
 
 // private members
 private:
     int mCameraId;
+    CameraWindow mActivePixelArray;
+    float mHyperFocalDistance; /**< in millimeters */
+    bool mEnableAiqdDataSave;
 
 private:
     Rk3aAiq mAiq;

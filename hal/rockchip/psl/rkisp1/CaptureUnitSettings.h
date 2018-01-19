@@ -21,10 +21,11 @@
 #ifndef CAMERA3_HAL_CAPTUREUNITSETTINGS_H_
 #define CAMERA3_HAL_CAPTUREUNITSETTINGS_H_
 
+#include <ia_isp_types.h>
 #include "Rk3aPlus.h"
 #include "CameraWindow.h"
 #include "AndroidIspControls.h"
-#include "RKISP1Common.h"
+#include "RKISP1Types.h"
 
 namespace android {
 namespace camera2 {
@@ -43,9 +44,9 @@ struct ImageEnhancementSettings {
 };
 
 struct IspSettings {
-    /* ia_isp_feature_setting nrSetting; */
-    /* ia_isp_feature_setting eeSetting; */
-    /* ia_isp_effect effects; */
+    ia_isp_feature_setting nrSetting;
+    ia_isp_feature_setting eeSetting;
+    ia_isp_effect effects;
     ImageEnhancementSettings manualSettings;
     IspSettings() { CLEAR(*this); }
 };

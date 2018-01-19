@@ -135,7 +135,7 @@ status_t FrameWorker::allocateWorkerBuffers()
             return BAD_VALUE;
         }
 
-        mBuffers[i].setBytesused(PAGE_ALIGN(mFormat.sizeimage()));
+        mBuffers[i].setBytesused(mFormat.sizeimage());
         mCameraBuffers.push_back(buf);
     }
 

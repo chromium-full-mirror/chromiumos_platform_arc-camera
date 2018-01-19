@@ -216,31 +216,9 @@ status_t OutputFrameWorker::run()
         return OK;
     }
 
-    // If output format is something else than
-    // NV21 or Android flexible YCbCr 4:2:0, return
-    if (mOutputBuffer->format() != HAL_PIXEL_FORMAT_YCrCb_420_SP &&
-            mOutputBuffer->format() != HAL_PIXEL_FORMAT_YCbCr_420_888 &&
-            mOutputBuffer->format() != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-            mOutputBuffer->format() != HAL_PIXEL_FORMAT_BLOB)  {
-        LOGE("Bad format %d", mOutputBuffer->format());
-        return BAD_TYPE;
-    }
-
     V4L2BufferInfo outBuf;
 
     status = mNode->grabFrame(&outBuf);
-
-#ifdef USED_FAKE_INPUTSYS
-    ICaptureEventListener::CaptureMessage outMsg;
-    Camera3Request* request = mMsg->cbMetadataMsg.request;
-    outMsg.data.event.reqId = request->getId();
-    outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
-    outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
-    outMsg.data.event.timestamp = outBuf.vbuffer.timestamp();
-    outMsg.data.event.sequence = outBuf.vbuffer.sequence();
-    notifyListeners(&outMsg);
-#endif
-
     return (status < 0) ? status : OK;
 }
 
@@ -316,7 +294,7 @@ status_t OutputFrameWorker::postRun()
     }
     if (status != OK) {
         LOGE("@%s, postprocess failed! [%d]!", __FUNCTION__, status);
-        // Return buffer anyway
+        goto exit;
     }
 
     // Dump the buffers if enabled in flags
@@ -624,12 +602,12 @@ int OutputFrameWorker::SWPostProcessor::getRotationDegrees(
              stream->stream_type);
         return 0;
     }
-#if 0 //TODO: zyc
+
     if (stream->crop_rotate_scale_degrees == CAMERA3_STREAM_ROTATION_90)
         return 90;
     else if (stream->crop_rotate_scale_degrees == CAMERA3_STREAM_ROTATION_270)
         return 270;
-#endif
+
     return 0;
 }
 

@@ -34,7 +34,6 @@
 #include <fcntl.h>         // open(), close()
 #include <linux/media.h>   // media controller
 #include <linux/kdev_t.h>  // MAJOR(), MINOR()
-#include <sys/stat.h>
 #include <string>
 #include <sstream>
 #include <sys/stat.h>
@@ -815,8 +814,6 @@ status_t CameraHWInfo::initDriverList()
 
     int mcExist = stat(mMediaControllerPathName.c_str(), &sb);
 
-    LOG1("mMediaControllerPathName %s\n", mMediaControllerPathName.c_str());
-
     if (mcExist == 0) {
         mHasMediaController = true;
         ret = findMediaControllerSensors();
@@ -980,11 +977,9 @@ status_t CameraHWInfo::getCSIPortID(const std::string &deviceName, int &portId)
     const char *CSI_RX_PORT_NAME_TEMPLATE1 = "CSI-2";
     const char *CSI_RX_PORT_NAME_TEMPLATE2 = "CSI2-port";
     const char *CSI_RX_PORT_NAME_TEMPLATE3 = "TPG";
-    const char *CSI_RX_PORT_NAME_TEMPLATE4 = "mipi-dphy";
     nameTemplateVec.push_back(CSI_RX_PORT_NAME_TEMPLATE1);
     nameTemplateVec.push_back(CSI_RX_PORT_NAME_TEMPLATE2);
     nameTemplateVec.push_back(CSI_RX_PORT_NAME_TEMPLATE3);
-    nameTemplateVec.push_back(CSI_RX_PORT_NAME_TEMPLATE4);
 
     std::shared_ptr<MediaController> mediaCtl = std::make_shared<MediaController>(mMediaControllerPathName.c_str());
     if (!mediaCtl) {

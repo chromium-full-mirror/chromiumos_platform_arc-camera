@@ -27,6 +27,7 @@
 #include "CaptureUnit.h"
 #include "ImguUnit.h"
 #include "CameraStream.h"
+#include "RKISP1CapturedStatistics.h"
 #include "RKISP1CameraCapInfo.h"
 #include "CameraMetadataHelper.h"
 #include "PlatformData.h"
@@ -62,6 +63,8 @@ ControlUnit::ControlUnit(ImguUnit *thePU,
         mMetadata(nullptr),
         m3ARunner(nullptr),
         mLensController(nullptr),
+        mAfFirstRun(true),
+        mAfApplySequence(0),
         mSofSequence(0)
 {
 }
@@ -72,6 +75,7 @@ ControlUnit::init()
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     status_t status = OK;
     const char *sensorName = nullptr;
+    ia_binary_data nvmData = {nullptr, 0};
     LensHw *lensController;
 
     mMessageThread = std::unique_ptr<MessageThread>(new MessageThread(this, "CtrlUThread"));
@@ -91,9 +95,13 @@ ControlUnit::init()
         return UNKNOWN_ERROR;
     }
 
-    /* TODO */
-    /* m3aWrapper->enableAiqdDataSave(true); */
-    if (m3aWrapper->initAIQ(sensorName) != NO_ERROR) {
+    m3aWrapper->enableAiqdDataSave(true);
+    if (cap)
+        nvmData = cap->mNvmData;
+    if (m3aWrapper->initAIQ(MAX_STATISTICS_WIDTH,
+                            MAX_STATISTICS_HEIGHT,
+                            nvmData,
+                            sensorName) != NO_ERROR) {
         LOGE("Error initializing 3A control");
         return UNKNOWN_ERROR;
     }
@@ -131,8 +139,7 @@ ControlUnit::init()
     bool supportDigiGain = false;
     if (cap)
         supportDigiGain = cap->digiGainOnSensor();
-
-    status = m3ARunner->init();
+    status = m3ARunner->init(supportDigiGain);
     if (CC_UNLIKELY(status != OK)) {
         LOGE("Error Initializing 3A Runner");
         return UNKNOWN_ERROR;
@@ -165,87 +172,14 @@ void RequestCtrlState::reset(RequestCtrlState* me)
     }
 }
 
-void RequestCtrlState::initAAAControls()
-{
-    const CameraMetadata* settings = request->getSettings();
-    if (CC_UNLIKELY(settings == nullptr)) {
-        LOGE("no settings in request - BUG");
-        return;
-    }
-
-    camera_metadata_ro_entry entry;
-    entry = settings->find(ANDROID_CONTROL_MODE);
-    if (entry.count == 1) {
-        aaaControls.controlMode = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AE_ANTIBANDING_MODE);
-    if (entry.count == 1) {
-        aaaControls.ae.aeAntibanding = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AE_EXPOSURE_COMPENSATION);
-    if (entry.count == 1) {
-        aaaControls.ae.evCompensation = entry.data.i32[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AE_LOCK);
-    if (entry.count == 1) {
-        aaaControls.ae.aeLock = entry.data.u8[0];
-    }
-    /* entry = settings->find(ANDROID_CONTROL_AE_REGIONS); */
-    /* if (entry.count == 1) { */
-    /*     aaaControls.ae.aeMode = entry.data.u8[0]; */
-    /* } */
-    entry = settings->find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
-    if (entry.count > 1) {
-        aaaControls.ae.aeTargetFpsRange[0] = entry.data.i32[0];
-        aaaControls.ae.aeTargetFpsRange[1] = entry.data.i32[1];
-    }
-    entry = settings->find(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER);
-    if (entry.count == 1) {
-        aaaControls.ae.aePreCaptureTrigger = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AF_MODE);
-    if (entry.count == 1) {
-        aaaControls.af.afMode = entry.data.u8[0];
-    }
-    /* entry = settings->find(ANDROID_CONTROL_AF_REGIONS); */
-    /* if (entry.count == 1) { */
-    /*     aaaControls.af.afMode = entry.data.u8[0]; */
-    /* } */
-    entry = settings->find(ANDROID_CONTROL_AF_TRIGGER);
-    if (entry.count == 1) {
-        aaaControls.af.afTrigger = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AWB_LOCK);
-    if (entry.count == 1) {
-        aaaControls.awb.awbLock = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_CONTROL_AWB_MODE);
-    if (entry.count == 1) {
-        aaaControls.awb.awbMode = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_COLOR_CORRECTION_MODE);
-    if (entry.count == 1) {
-        aaaControls.awb.colorCorrectionMode = entry.data.u8[0];
-    }
-    entry = settings->find(ANDROID_COLOR_CORRECTION_ABERRATION_MODE);
-    if (entry.count == 1) {
-        aaaControls.awb.colorCorrectionAberrationMode = entry.data.u8[0];
-    }
-    /* entry = settings->find(ANDROID_CONTROL_AWB_REGIONS); */
-    /* if (entry.count == 1) { */
-    /*     aaaControls.awb.awbMode = entry.data.u8[0]; */
-    /* } */
-}
-
 void RequestCtrlState::init(Camera3Request *req,
                                          std::shared_ptr<GraphConfig> aGraphConfig)
 {
     request = req;
     graphConfig = aGraphConfig;
-    /* aiqInputParams.init(); */
+    aiqInputParams.init();
     if (CC_LIKELY(captureSettings)) {
-        /* captureSettings->aiqResults.init(); */
-        CLEAR(captureSettings->aiqResults);
+        captureSettings->aiqResults.init();
         captureSettings->aiqResults.requestId = req->getId();
         captureSettings->afRegion.init(0);
         captureSettings->aeRegion.init(0);
@@ -277,7 +211,6 @@ void RequestCtrlState::init(Camera3Request *req,
     aaaControls.af.afTrigger =  ANDROID_CONTROL_AF_TRIGGER_IDLE;
     aaaControls.awb.awbMode =  ANDROID_CONTROL_AWB_MODE_AUTO;
     aaaControls.controlMode =  ANDROID_CONTROL_MODE_AUTO;
-    initAAAControls();
 
     tonemapContrastCurve = false;
     rGammaLut = nullptr;
@@ -514,7 +447,7 @@ ControlUnit::handleNewRequest(Message &msg)
         mLatestRequestId == -1 ||
         reqState->request->getBufferCountOfFormat(HAL_PIXEL_FORMAT_BLOB) > 0 ||
         (mLatestStatistics != nullptr &&
-         mLatestRequestId == mLatestStatistics->frame_id)) {
+         mLatestRequestId == mLatestStatistics->id)) {
       mPendingRequests.erase(mPendingRequests.begin());
 
       status = processRequestForCapture(reqState, mLatestStatistics);
@@ -527,67 +460,6 @@ ControlUnit::handleNewRequest(Message &msg)
 
     return status;
 }
-
-void dumpAEC(rk_aiq_ae_results aec_result)
-{
-    LOG2("AecResultDump:exposure(%d,%f,%f,%d), sensor_exposure(%d,%d,%d,%d,%d,%d), aec_config_result:enabled(%d) win(%d,%d,%d,%d) mode(%d)",
-        aec_result.exposure.exposure_time_us,
-        aec_result.exposure.analog_gain,
-        aec_result.exposure.digital_gain,
-        aec_result.exposure.iso,
-
-        aec_result.sensor_exposure.fine_integration_time,
-        aec_result.sensor_exposure.coarse_integration_time,
-        aec_result.sensor_exposure.analog_gain_code_global,
-        aec_result.sensor_exposure.digital_gain_global,
-        aec_result.sensor_exposure.line_length_pixels,
-        aec_result.sensor_exposure.frame_length_lines,
-
-        aec_result.aec_config_result.enabled,
-        aec_result.aec_config_result.win.h_offset,
-        aec_result.aec_config_result.win.v_offset,
-        aec_result.aec_config_result.win.width,
-        aec_result.aec_config_result.win.height,
-        aec_result.aec_config_result.mode);
-}
-void dumpAWB(rk_aiq_awb_results awb_result)
-{
-    LOG2("AwbResultDump:enabled(%d), awb_meas_mode(%d), awb_meas_cfg(%d,%d,%d,%d,%d,%d), awb_win(%d,%d,%d,%d),gain(%d,%d,%d,%d),gain enable(%d)",
-        awb_result.awb_meas_cfg.enabled,
-        awb_result.awb_meas_cfg.awb_meas_mode,
-
-        awb_result.awb_meas_cfg.awb_meas_cfg.max_y,
-        awb_result.awb_meas_cfg.awb_meas_cfg.ref_cr_max_r,
-        awb_result.awb_meas_cfg.awb_meas_cfg.min_y_max_g,
-        awb_result.awb_meas_cfg.awb_meas_cfg.ref_cb_max_b,
-        awb_result.awb_meas_cfg.awb_meas_cfg.max_c_sum,
-        awb_result.awb_meas_cfg.awb_meas_cfg.min_c,
-
-        awb_result.awb_meas_cfg.awb_win.h_offset,
-        awb_result.awb_meas_cfg.awb_win.v_offset,
-        awb_result.awb_meas_cfg.awb_win.width,
-        awb_result.awb_meas_cfg.awb_win.height,
-
-        awb_result.awb_gain_cfg.awb_gains.red_gain,
-        awb_result.awb_gain_cfg.awb_gains.green_r_gain,
-        awb_result.awb_gain_cfg.awb_gains.green_b_gain,
-        awb_result.awb_gain_cfg.awb_gains.blue_gain,
-        awb_result.awb_gain_cfg.enabled
-        );
-}
-void dumpAF(rk_aiq_af_results aiqresults)
-{
-}
-void dumpMISC(rk_aiq_misc_isp_results aiqresults)
-{
-}
-
-void dump3A(struct AiqResults aiqresults)
-{
-    dumpAEC(aiqresults.aeResults);
-    dumpAWB(aiqresults.awbResults);
-}
-
 
 /**
  * processRequestForCapture
@@ -603,7 +475,7 @@ void dump3A(struct AiqResults aiqresults)
  */
 status_t
 ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqState,
-                                      std::shared_ptr<rk_aiq_statistics_input_params> &stats)
+                                      std::shared_ptr<RKISP1CapturedStatistics> &stats)
 {
     status_t status = NO_ERROR;
     if (CC_UNLIKELY(reqState.get() == nullptr)) {
@@ -630,13 +502,9 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
 
     if (stats != nullptr) {
         prepareStats(*reqState, *stats.get());
-    } else {
-        status = m3aWrapper->setStatistics(NULL, &mSensorDescriptor);
-        if (CC_UNLIKELY(status != OK)) {
-            LOGW("Failed to set statistics for 3A iteration");
-        }
+        LOG2("%s, stats frame sequence %u", __FUNCTION__, stats->frameSequence);
     }
-    /*TODO: zyc*/
+
     bool forceUpdated = (mLatestRequestId < 0 ? true : false);
     status = m3ARunner->run2A(*reqState, forceUpdated);
     if (status != NO_ERROR) {
@@ -644,13 +512,28 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
        return status;
     }
 
-    /* mMetadata->writeLSCMetadata(reqState); */
+    mMetadata->writeLSCMetadata(reqState);
 
-    /*TODO: zyc*/
-    //m3ARunner->runAf(*reqState);
-    AiqResults &LastaiqResults = m3ARunner->getLatestResults();
-    LastaiqResults = reqState->captureSettings->aiqResults;
-    dump3A(reqState->captureSettings->aiqResults);
+    bool bypass = true;
+    if (mAfFirstRun || (stats != nullptr && stats->frameSequence >= mAfApplySequence)) {
+        if (stats != nullptr) {
+            LOG2("%s, mAfApplySequence %u, frame sequence %u, mSofSequence %u",
+                  __FUNCTION__, mAfApplySequence, stats->frameSequence, mSofSequence);
+        }
+        mAfApplySequence = mSofSequence + 1;
+        mAfFirstRun = false;
+        bypass = false;
+    }
+    m3ARunner->runAf(*reqState, bypass);
+
+    // Latest results are saved for the next frame calculation if we do not
+    // find the correct results.
+    // TODO: Remove this once we fix the request flow so we can use the results
+    // from the request at prepareStats
+    m3aWrapper->deepCopyAiqResults(m3ARunner->getLatestResults(),
+                                   reqState->captureSettings->aiqResults,
+                                   true);
+    m3ARunner->updateInputParams(reqState->aiqInputParams);
 
     status = mCaptureUnit->doCapture(reqState->request,
                                      reqState->captureSettings,
@@ -674,15 +557,6 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
      */
     if (reqState->aaaControls.controlMode != ANDROID_CONTROL_MODE_OFF_KEEP_STATE &&
         reqState->aaaControls.controlMode != ANDROID_CONTROL_MODE_OFF) {
-        if (mSettingsHistory.size() > 0) {
-            std::vector<std::shared_ptr<CaptureUnitSettings>>::iterator it;
-            for (it = mSettingsHistory.begin(); it != mSettingsHistory.end(); ++it) {
-                if ((*it)->inEffectFrom == reqState->captureSettings->inEffectFrom) {
-                    mSettingsHistory.erase(it);
-                    it--;
-                }
-            }
-        }
         mSettingsHistory.push_back(reqState->captureSettings);
     }
 
@@ -699,13 +573,12 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
     if (jpegBufCount > 0) {
         // NOTE: Makernote should be get after isp_bxt_run()
         // NOTE: makernote.data deleted in JpegEncodeTask::handleMakernote()
-        /* TODO */
-        /* const unsigned mknSize = MAKERNOTE_SECTION1_SIZE + MAKERNOTE_SECTION2_SIZE; */
-        /* MakernoteData mkn = {nullptr, mknSize}; */
-        /* mkn.data = new char[mknSize]; */
-        /* m3aWrapper->getMakerNote(ia_mkn_trg_section_2, mkn); */
+        const unsigned mknSize = MAKERNOTE_SECTION1_SIZE + MAKERNOTE_SECTION2_SIZE;
+        MakernoteData mkn = {nullptr, mknSize};
+        mkn.data = new char[mknSize];
+        m3aWrapper->getMakerNote(ia_mkn_trg_section_2, mkn);
 
-        /* reqState->captureSettings->makernote = mkn; */
+        reqState->captureSettings->makernote = mkn;
 
     } else {
         // No JPEG buffers in request. Reset MKN info, just in case.
@@ -764,11 +637,15 @@ ControlUnit::handleNewStat(Message &msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
     status_t status = NO_ERROR;
-    std::shared_ptr<rk_aiq_statistics_input_params> stats = msg.stats;
+    std::shared_ptr<RKISP1CapturedStatistics> stats = msg.stats;
     int statsId = 0;
     if (stats.get() != nullptr) {
-        statsId = stats->frame_id;
-        mLatestStatistics = stats;
+        statsId = stats->id;
+
+        // Still pipe has no stats output and data is invalid
+        // so here only valid data are saved.
+        if (stats->rgbsGridArray[0] && stats->rgbsGridArray[0]->grid_width)
+            mLatestStatistics = stats;
     }
 
     if (mPendingRequests.empty()) {
@@ -823,13 +700,11 @@ ControlUnit::completeProcessing(std::shared_ptr<RequestCtrlState> &reqState)
     if (reqState->framesArrived == 1) {
         mMetadata->writeAwbMetadata(*reqState);
         mMetadata->writeSensorMetadata(*reqState);
-        //TODO, zyc
-        /* mMetadata->writePAMetadata(*reqState); */
+        mMetadata->writePAMetadata(*reqState);
         mMetadata->writeJpegMetadata(*reqState);
         mMetadata->writeMiscMetadata(*reqState);
         mMetadata->writeLensMetadata(*reqState);
-        //TODO, zyc
-        /* mMetadata->fillTonemapCurve(*reqState); */
+        mMetadata->fillTonemapCurve(*reqState);
 
         // TODO: calculate proper rolling shutter skew
         int64_t rollingShutterSkew = 1000000; // default 1ms
@@ -844,7 +719,6 @@ ControlUnit::completeProcessing(std::shared_ptr<RequestCtrlState> &reqState)
     }
 
     updateMeta = true;
-    #ifndef USED_FAKE_INPUTSYS
     /*
      * Remove the request from Q once we have received all pixel data buffers
      * we expect from ISA. Query the graph config for that.
@@ -853,7 +727,6 @@ ControlUnit::completeProcessing(std::shared_ptr<RequestCtrlState> &reqState)
      */
     if (reqState->request->getNumberInputBufs() == 0)
         mWaitingForCapture.erase(reqId);
-    #endif
 
     if (CC_LIKELY((reqState->request != nullptr) &&
                   (reqState->captureSettings.get() != nullptr))) {
@@ -894,24 +767,12 @@ ControlUnit::handleNewShutter(Message &msg)
         LOGE("Unexpected shutter event received for request %d - Fix the bug", reqId);
         return UNKNOWN_ERROR;
     }
-
     reqState = it->second;
     if (CC_UNLIKELY(reqState.get() == nullptr || reqState->captureSettings.get() == nullptr)) {
         LOGE("No valid state or settings for request Id = %d"
              "- Fix the bug!", reqId);
         return UNKNOWN_ERROR;
     }
-
-#ifdef USED_FAKE_INPUTSYS
-        /*
-         * Remove the request from Q once we have received all pixel data buffers
-         * we expect from ISA. Query the graph config for that.
-         *
-         * Request which are processed from input buffers do not wait for pixel data
-         */
-        if (reqState->request->getNumberInputBufs() == 0)
-            mWaitingForCapture.erase(reqId);
-#endif
 
     /* flash state - hack, should know from frame whether it fired */
     const CameraMetadata* metaData = reqState->request->getSettings();
@@ -924,6 +785,7 @@ ControlUnit::handleNewShutter(Message &msg)
 
     //# ANDROID_METADATA_Dynamic android.flash.state done
     reqState->ctrlUnitResult->update(ANDROID_FLASH_STATE, &flashState, 1);
+
     int64_t ts = msg.data.shutter.tv_sec * 1000000000; // seconds to nanoseconds
     ts += msg.data.shutter.tv_usec * 1000; // microseconds to nanoseconds
 
@@ -941,7 +803,6 @@ ControlUnit::handleNewSensorDescriptor(Message &msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     mMetadata->FillSensorDescriptor(msg);
-    mSensorDescriptor = msg.data.sensor.exposureDesc;
     return mSettingsProcessor->handleNewSensorDescriptor(msg);
 }
 
@@ -964,6 +825,7 @@ ControlUnit::handleMessageFlush(void)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
 
+    mAfApplySequence = 0;
     mWaitingForCapture.clear();
     mPendingRequests.clear();
     mSettingsHistory.clear();
@@ -1043,8 +905,7 @@ ControlUnit::notifyCaptureEvent(CaptureMessage *captureMsg)
         case CAPTURE_EVENT_RAW_BAYER:
             msg.id = MESSAGE_ID_NEW_IMAGE;
             msg.type = CAPTURE_EVENT_RAW_BAYER;
-            /* msg.requestId = captureMsg->data.event.pixelBuffer->buf->requestId(); */
-            msg.requestId = captureMsg->data.event.reqId;
+            msg.requestId = captureMsg->data.event.pixelBuffer->buf->requestId();
             msg.rawBuffer = captureMsg->data.event.pixelBuffer;
             mMessageQueue.send(&msg);
             break;
@@ -1069,11 +930,7 @@ ControlUnit::notifyCaptureEvent(CaptureMessage *captureMsg)
             msg.data.shutter.requestId = captureMsg->data.event.reqId;
             msg.data.shutter.tv_sec = captureMsg->data.event.timestamp.tv_sec;
             msg.data.shutter.tv_usec = captureMsg->data.event.timestamp.tv_usec;
-            #ifdef USED_FAKE_INPUTSYS
-            mMessageQueue.send(&msg, MESSAGE_ID_NEW_SHUTTER);
-            #else
             mMessageQueue.send(&msg);
-            #endif
             break;
         case CAPTURE_EVENT_NEW_SOF:
             mSofSequence = captureMsg->data.event.sequence;
@@ -1108,39 +965,51 @@ ControlUnit::notifyCaptureEvent(CaptureMessage *captureMsg)
  * \param s [OUT]: structure holding the captured stats
  */
 void ControlUnit::prepareStats(RequestCtrlState &reqState,
-                               rk_aiq_statistics_input_params &s)
+                               RKISP1CapturedStatistics &s)
 {
     status_t status = NO_ERROR;
     std::shared_ptr<CaptureUnitSettings> settingsInEffect = nullptr;
-    LOG2(" %s: statistics from request %lld used to process request %d",
-        __FUNCTION__, s.frame_id,
+    LOG2(" %s: statistics from request %d used to process request %d",
+        __FUNCTION__, s.id,
         reqState.request->getId());
 
     // Prepare the input parameters for the statistics
-    rk_aiq_statistics_input_params* params = &s;
+    rk_aiq_statistics_input_params* params = &s.aiqStatsInputParams;
+    params->camera_orientation = rk_aiq_camera_orientation_unknown;
+
+    params->external_histograms = nullptr;
+    params->num_external_histograms = 0;
 
     settingsInEffect = findSettingsInEffect(params->frame_id);
     if (settingsInEffect.get()) {
-        params->ae_results = &settingsInEffect->aiqResults.aeResults;
+        params->frame_ae_parameters = &settingsInEffect->aiqResults.aeResults;
+        params->frame_af_parameters = &settingsInEffect->aiqResults.afResults;
         params->awb_results = &settingsInEffect->aiqResults.awbResults;
-        params->af_results = &settingsInEffect->aiqResults.afResults;
-        params->misc_results = &settingsInEffect->aiqResults.miscIspResults;
+        params->frame_sa_parameters = &settingsInEffect->aiqResults.saResults;
+        params->frame_pa_parameters = &settingsInEffect->aiqResults.paResults;
     } else {
         LOG1("preparing statistics from exp %lld that we do not track", params->frame_id);
 
         // default to latest results
         AiqResults& latestResults = m3ARunner->getLatestResults();
-        params->ae_results = &latestResults.aeResults;
-        params->af_results = &latestResults.afResults;
+        params->frame_ae_parameters = &latestResults.aeResults;
+        params->frame_af_parameters = &latestResults.afResults;
         params->awb_results = &latestResults.awbResults;
-        params->misc_results = &latestResults.miscIspResults;
+        params->frame_sa_parameters = &latestResults.saResults;
+        params->frame_pa_parameters = &latestResults.paResults;
     }
 
-    status = m3aWrapper->setStatistics(params, &mSensorDescriptor);
+    /**
+     * Pass stats to all 3A algorithms
+     * Since at the moment we do not have separate events for AF and AA stats
+     * there is no need to pass the stats per algorithm.
+     * AF usually runs first, but not always. For that reason we pass the stats
+     * to the AIQ algorithms here.
+     */
+    status = m3aWrapper->setStatistics(params);
     if (CC_UNLIKELY(status != OK)) {
         LOGW("Failed to set statistics for 3A iteration");
     }
-    /* findSettingsInEffect(0); */
 
     // algo's are ready to run
     reqState.afState = ALGORITHM_READY;
@@ -1163,9 +1032,6 @@ std::shared_ptr<CaptureUnitSettings> ControlUnit::findSettingsInEffect(uint64_t 
     std::shared_ptr<CaptureUnitSettings> settingsInEffect = nullptr;
     std::vector<std::shared_ptr<CaptureUnitSettings>>::iterator it;
     for (it = mSettingsHistory.begin(); it != mSettingsHistory.end(); ++it) {
-        LOG2("%s:%d:mSettingsHistory.size(%d) ineffectFrom(%d), expId(%lld), exposure(%d), aec gain(%d)", __func__, __LINE__,mSettingsHistory.size(), (*it)->inEffectFrom, expId,
-             (*it)->aiqResults.aeResults.sensor_exposure.coarse_integration_time,
-             (*it)->aiqResults.aeResults.sensor_exposure.analog_gain_code_global);
         if ((*it)->inEffectFrom == expId) {
             // we found the exact settings
             settingsInEffect = *it;
@@ -1179,13 +1045,11 @@ std::shared_ptr<CaptureUnitSettings> ControlUnit::findSettingsInEffect(uint64_t 
             break;
         }
     }
-
     if (it == mSettingsHistory.end() && !mSettingsHistory.empty()) {
-        LOG2("Could not find settings for expID %lld providing for %d", expId,
+        LOG2("Could not find settings for expID %" PRIu64 " providing for %d", expId,
              mSettingsHistory[0]->inEffectFrom);
         settingsInEffect = mSettingsHistory[0];
     }
-
     // Keep the size of the history fixed
     if (mSettingsHistory.size() == MAX_SETTINGS_HISTORY_SIZE)
         mSettingsHistory.erase(mSettingsHistory.begin());
@@ -1194,5 +1058,4 @@ std::shared_ptr<CaptureUnitSettings> ControlUnit::findSettingsInEffect(uint64_t 
 
 } // namespace camera2
 } // namespace android
-
 

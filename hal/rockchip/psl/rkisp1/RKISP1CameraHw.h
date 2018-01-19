@@ -30,8 +30,8 @@ namespace android {
 namespace camera2 {
 
 class ControlUnit;
-class ImguUnit;
 class CaptureUnit;
+class ImguUnit;
 
 /**
  * \enum

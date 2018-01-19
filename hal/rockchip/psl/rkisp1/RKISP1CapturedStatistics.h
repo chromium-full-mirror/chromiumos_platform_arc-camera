@@ -39,7 +39,20 @@ namespace camera2 {
  * the statistics is set to the algo via rk_aiq_statistics_set().
  */
 struct RKISP1CapturedStatistics {
+    int id;     /* request Id */
+
+    /* the buffers are from mAfFilterBuffPool and mRgbsGridBuffPool in StatisticsWorker */
+    std::shared_ptr<rk_aiq_af_grid> pooledAfGrid;
+    std::shared_ptr<rk_aiq_rgbs_grid> pooledRGBSGrid;
+
     rk_aiq_statistics_input_params aiqStatsInputParams;
+
+#define MAX_NUM_RGBS_GRIDS 1
+#define MAX_NUM_AF_GRIDS 1
+    const rk_aiq_rgbs_grid* rgbsGridArray[MAX_NUM_RGBS_GRIDS];
+    const rk_aiq_af_grid* afGridArray[MAX_NUM_AF_GRIDS];
+    rk_aiq_af_results af_results;
+    uint32_t frameSequence;
 };
 
 } //namespace android

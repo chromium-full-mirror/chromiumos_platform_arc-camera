@@ -83,7 +83,7 @@ typedef struct {
 
 typedef struct {
     string entityName;
-    struct v4l2_selection select;
+    struct v4l2_subdev_selection select;
 } MediaCtlSelectionVideoParams;
 
 typedef struct {

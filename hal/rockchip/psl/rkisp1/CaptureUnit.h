@@ -26,12 +26,12 @@
 #include "MessageThread.h"
 #include "CaptureBuffer.h"
 #include "CaptureUnitSettings.h"
+#include "RKISP1CapturedStatistics.h"
 #include "GraphConfig.h"
 #include "ItemPool.h"
 #include "InputSystem.h"
 #include "SyncManager.h"
 #include "LensHw.h"
-#include <linux/rkisp1-config.h>
 
 #ifndef __CAPTURE_UNIT_H__
 #define __CAPTURE_UNIT_H__
@@ -88,8 +88,7 @@ public:
         struct timeval   timestamp;
         unsigned int     sequence;
         std::shared_ptr<CaptureBuffer> pixelBuffer;   /**< Single buffer for output from CaptureUnit. To be identified by CaptureEventType  */
-        std::shared_ptr<rk_aiq_statistics_input_params> stats;
-        std::shared_ptr<rkisp1_isp_params_cfg> param;
+        std::shared_ptr<RKISP1CapturedStatistics> stats;
         std::shared_ptr<CameraBuffer> yuvBuffer;
         unsigned int     reqId;
         rk_aiq_exposure_sensor_descriptor exposureDesc;
@@ -325,7 +324,7 @@ private:
     SettingsProcessor *mSettingProcessor; /* CaptureUnit doesn't own mSettingProcessor */
     uint8_t mPipelineDepth;
 
-    std::shared_ptr<InputSystemBase>                 mIsys;
+    std::shared_ptr<InputSystem>                 mIsys;
     std::shared_ptr<SyncManager>    mSyncManager;
 
     /* Queue of requests */

@@ -45,8 +45,8 @@ public:
     virtual CameraCapInfo *getCameraCapInfo(int cameraId);
     virtual camera_metadata_t *constructDefaultMetadata(int cameraId, int reqTemplate);
 
-    static const char *getSensorMediaDeviceName() { return "rkisp1"; }
-    static const char *getImguEntityMediaDevice() { return "rkisp1"; }
+    static const char *getSensorMediaDeviceName() { return "rkisp1-cio2"; }
+    static const char *getImguEntityMediaDevice() { return "rkisp1-imgu"; }
 
     static std::string getSensorMediaDevicePath();
     static std::string getMediaDeviceByName(std::string deviceName);

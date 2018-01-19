@@ -20,18 +20,12 @@
 #ifndef _CAMERA3_HAL_RKISP1_COMMON_H_
 #define _CAMERA3_HAL_RKISP1_COMMON_H_
 
-#include <ia_types.h>
-
 namespace android {
 namespace camera2 {
+#define INVALID_BPP (-1)
 
-
-// typedefs
-typedef ia_binary_data MakernoteData;
-
-// consts
-extern const int JPEG_QUALITY_DEFAULT;
-extern const int THUMBNAIL_QUALITY_DEFAULT;
+int isysRawBpp(int fourcc);
+bool isWideAspectRatio(int width, int height);
 
 }  // namespace camera2
 }  // namespace android

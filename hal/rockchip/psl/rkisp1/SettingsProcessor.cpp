@@ -23,7 +23,8 @@
 #include "SettingsProcessor.h"
 #include "CameraMetadataHelper.h"
 #include "PlatformData.h"
-#include "Rk3aPlus.h"
+#include "RKISP1Types.h"
+#include "RkAFStateMachine.h"
 
 
 #include "LogHelper.h"
@@ -34,8 +35,10 @@ namespace camera2 {
 SettingsProcessor::SettingsProcessor(int cameraId,
         Rk3aPlus *a3aWrapper, IStreamConfigProvider &aStreamCfgProv) :
         mCameraId(cameraId),
+        m3aWrapper(a3aWrapper),
         mMinSensorModeFrameTime(INT32_MAX),
-        mStreamCfgProv(aStreamCfgProv)
+        mStreamCfgProv(aStreamCfgProv),
+        mFixedFocus(false)
 {
     /**
      * cache some static value for later use
@@ -55,8 +58,7 @@ status_t SettingsProcessor::init()
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
 
     // save state for fix focus;
-    /* TODO */
-    /* mFixedFocus = (m3aWrapper->getMinFocusDistance() == 0.0f); */
+    mFixedFocus = (m3aWrapper->getMinFocusDistance() == 0.0f);
 
     return OK;
 }
@@ -106,6 +108,19 @@ SettingsProcessor::processRequestSettings(const CameraMetadata  &settings,
 
     if ((status = processHotPixelSettings(settings, reqAiqCfg)) != OK)
         return status;
+
+    PAInputParams params;
+    params.aiqInputParams = &reqAiqCfg.aiqInputParams;
+    if ((status = m3aWrapper->fillPAInputParams(settings, params)) != OK)
+        return status;
+
+    SAInputParams saParams;
+    saParams.aiqInputParams = &reqAiqCfg.aiqInputParams;
+    if ((status = m3aWrapper->fillSAInputParams(settings, saParams)) != OK)
+        return status;
+
+    reqAiqCfg.captureSettings->shadingMode = saParams.saMode;
+    reqAiqCfg.captureSettings->shadingMapMode = saParams.shadingMapMode;
 
     return processTestPatternMode(settings, reqAiqCfg);
 }
@@ -184,11 +199,11 @@ status_t SettingsProcessor::processIspSettings(const CameraMetadata &settings,
     if (entry.count == 1) {
         // mapping from 1->10 to -127->128
         uint8_t strength = entry.data.u8[0];
-        /* ispSettings->eeSetting.strength = ((strength * UINT8_MAX) / ANDROID_MAX_STRENGTH) - INT8_MIN; */
+        ispSettings->eeSetting.strength = ((strength * UINT8_MAX) / ANDROID_MAX_STRENGTH) - INT8_MIN;
         reqAiqCfg.captureSettings->ispControls.ee.strength = strength;
     } else {
         // does not affect according to ia_isp specs.
-        /* ispSettings->eeSetting.strength = 0; */
+        ispSettings->eeSetting.strength = 0;
     }
 
     //# ANDROID_METADATA_Control android.noiseReduction.mode done
@@ -200,21 +215,21 @@ status_t SettingsProcessor::processIspSettings(const CameraMetadata &settings,
 
     switch (noiseReductionMode) {
         case ANDROID_NOISE_REDUCTION_MODE_OFF:
-            /* ispSettings->nrSetting.feature_level = ia_isp_feature_level_off; */
+            ispSettings->nrSetting.feature_level = ia_isp_feature_level_off;
             break;
         case ANDROID_NOISE_REDUCTION_MODE_FAST:
             // the speed of execution is the same for high or low quality
             // therefore we apply also high quality in fast.
-            /* ispSettings->nrSetting.feature_level = ia_isp_feature_level_high; */
+            ispSettings->nrSetting.feature_level = ia_isp_feature_level_high;
             break;
         case ANDROID_NOISE_REDUCTION_MODE_HIGH_QUALITY:
-            /* ispSettings->nrSetting.feature_level = ia_isp_feature_level_high; */
+            ispSettings->nrSetting.feature_level = ia_isp_feature_level_high;
             break;
         case ANDROID_NOISE_REDUCTION_MODE_MINIMAL:
-            /* ispSettings->nrSetting.feature_level = ia_isp_feature_level_low; */
+            ispSettings->nrSetting.feature_level = ia_isp_feature_level_low;
             break;
         case ANDROID_NOISE_REDUCTION_MODE_ZERO_SHUTTER_LAG:
-            /* ispSettings->nrSetting.feature_level = ia_isp_feature_level_low; */
+            ispSettings->nrSetting.feature_level = ia_isp_feature_level_low;
             break;
         default:
             LOGE("ERROR: Unknown noise reduction mode %d", noiseReductionMode);
@@ -226,11 +241,11 @@ status_t SettingsProcessor::processIspSettings(const CameraMetadata &settings,
     if (entry.count == 1) {
         // mapping from 1->10 to -127->128
         uint8_t strength = entry.data.u8[0];
-        /* ispSettings->nrSetting.strength = ((strength * UINT8_MAX) / ANDROID_MAX_STRENGTH) - INT8_MIN; */
+        ispSettings->nrSetting.strength = ((strength * UINT8_MAX) / ANDROID_MAX_STRENGTH) - INT8_MIN;
         reqAiqCfg.captureSettings->ispControls.nr.strength = strength;
     } else {
         // does not affect according to ia_isp specs.
-        /* ispSettings->nrSetting.strength = 0; */
+        ispSettings->nrSetting.strength = 0;
     }
 
     //# ANDROID_METADATA_Control android.control.effectMode done
@@ -241,19 +256,19 @@ status_t SettingsProcessor::processIspSettings(const CameraMetadata &settings,
 
     switch (effectMode) {
         case ANDROID_CONTROL_EFFECT_MODE_OFF:
-            /* ispSettings->effects = ia_isp_effect_none; */
+            ispSettings->effects = ia_isp_effect_none;
             break;
         case ANDROID_CONTROL_EFFECT_MODE_MONO:
-            /* ispSettings->effects = ia_isp_effect_grayscale; */
+            ispSettings->effects = ia_isp_effect_grayscale;
             break;
         case ANDROID_CONTROL_EFFECT_MODE_NEGATIVE:
-            /* ispSettings->effects = ia_isp_effect_negative; */
+            ispSettings->effects = ia_isp_effect_negative;
             break;
         case ANDROID_CONTROL_EFFECT_MODE_SEPIA:
-            /* ispSettings->effects = ia_isp_effect_sepia; */
+            ispSettings->effects = ia_isp_effect_sepia;
             break;
         case ANDROID_CONTROL_EFFECT_MODE_AQUA:
-            /* ispSettings->effects = ia_isp_effect_aqua; */
+            ispSettings->effects = ia_isp_effect_aqua;
             break;
         case ANDROID_CONTROL_EFFECT_MODE_SOLARIZE:
         case ANDROID_CONTROL_EFFECT_MODE_POSTERIZE:
@@ -307,8 +322,42 @@ status_t
 SettingsProcessor::processAfSettings(const CameraMetadata  &settings,
                                RequestCtrlState &reqAiqCfg)
 {
-    //TODO
-    return OK;
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    status_t status = OK;
+
+    AfInputParams inParams;
+    inParams.aiqInputParams = &reqAiqCfg.aiqInputParams;
+    inParams.afControls = &reqAiqCfg.aaaControls.af;
+
+    m3aWrapper->fillAfInputParams(&settings, inParams);
+
+    /**
+     * If we are in fixed Focus, we do not need to return any af window, since
+     * available af window is 0.
+     */
+    if (mFixedFocus)
+        return status;
+
+    /**
+     * We pass the AF region directly from the input params
+     * to the capture settings.
+     * We clip the AfRegion with the Cropping region as required by V3 API
+     */
+    if (reqAiqCfg.aiqInputParams.afRegion.isValid()) {
+        /**
+         * clip the AF metering region with the cropping region
+         * cropping region is in Android coordinates, so it is the AF region
+         * at this point.
+         */
+        reqAiqCfg.captureSettings->afRegion = reqAiqCfg.aiqInputParams.afRegion;
+
+        reqAiqCfg.captureSettings->afRegion.clip(reqAiqCfg.captureSettings->cropRegion);
+    } else {
+        CLEAR(reqAiqCfg.captureSettings->afRegion);
+        // This is the normal case when there is no AF region defined.
+        reqAiqCfg.captureSettings->afRegion = reqAiqCfg.captureSettings->cropRegion;
+    }
+    return status;
 }
 
 /**
@@ -350,25 +399,24 @@ char SettingsProcessor::mapImageEnhancementSettings(const CameraMetadata &settin
                                               const int enhancementName,
                                               RequestCtrlState &reqAiqCfg)
 {
-    /* TODO */
-    /* camera_metadata_ro_entry entry; */
-    /* CLEAR(entry); */
-    /* entry = settings.find(enhancementName); */
-    /* if (entry.count == 1) { */
-    /*     int enhancementValue = entry.data.i32[0]; */
-    /*     // The result can be updated immadiately since the enhancement values */
-    /*     // will not change */
-    /*     reqAiqCfg.ctrlUnitResult->update(enhancementName, */
-    /*                                      &enhancementValue, */
-    /*                                      1); */
-    /*     if (abs(enhancementValue) <= UI_IMAGE_ENHANCEMENT_MAX) { */
-    /*         return(m3aWrapper->mapUiImageEnhancement2Aiq(enhancementValue)); */
-    /*     } else { */
-    /*         LOGE("Enhancement value %d outside expected range [%d,%d]", */
-    /*              enhancementValue, -UI_IMAGE_ENHANCEMENT_MAX, */
-    /*              UI_IMAGE_ENHANCEMENT_MAX); */
-    /*     } */
-    /* } */
+    camera_metadata_ro_entry entry;
+    CLEAR(entry);
+    entry = settings.find(enhancementName);
+    if (entry.count == 1) {
+        int enhancementValue = entry.data.i32[0];
+        // The result can be updated immadiately since the enhancement values
+        // will not change
+        reqAiqCfg.ctrlUnitResult->update(enhancementName,
+                                         &enhancementValue,
+                                         1);
+        if (abs(enhancementValue) <= UI_IMAGE_ENHANCEMENT_MAX) {
+            return(m3aWrapper->mapUiImageEnhancement2Aiq(enhancementValue));
+        } else {
+            LOGE("Enhancement value %d outside expected range [%d,%d]",
+                 enhancementValue, -UI_IMAGE_ENHANCEMENT_MAX,
+                 UI_IMAGE_ENHANCEMENT_MAX);
+        }
+    }
     return 0;
 }
 
@@ -377,35 +425,51 @@ status_t
 SettingsProcessor::processAeSettings(const CameraMetadata&  settings,
                                RequestCtrlState &reqAiqCfg)
 {
-    LOG2("%s:%d: sensorDesc(%f,%d,%d,%d,%d,%d,%d,%d,%d,%d)", __func__, __LINE__,
-         mSensorDescriptor.pixel_clock_freq_mhz,
-         mSensorDescriptor.pixel_periods_per_line,
-         mSensorDescriptor.line_periods_per_field,
-         mSensorDescriptor.line_periods_vertical_blanking,
-         mSensorDescriptor.fine_integration_time_min,
-         mSensorDescriptor.fine_integration_time_max_margin,
-         mSensorDescriptor.coarse_integration_time_min,
-         mSensorDescriptor.coarse_integration_time_max_margin,
-         mSensorDescriptor.sensor_output_width,
-         mSensorDescriptor.sensor_output_height);
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    status_t status = OK;
 
+    AeInputParams aeInputParams;
+    aeInputParams.aiqInputParams = &reqAiqCfg.aiqInputParams;
+    aeInputParams.aaaControls = &reqAiqCfg.aaaControls;
+    aeInputParams.croppingRegion = &reqAiqCfg.captureSettings->cropRegion;
+    aeInputParams.aeRegion = &reqAiqCfg.captureSettings->aeRegion;
+    aeInputParams.sensorDescriptor = &mSensorDescriptor;
 
-    rk_aiq_ae_input_params* aeInputParams;
-    aeInputParams = &reqAiqCfg.aiqInputParams.aeInputParams;
-    aeInputParams->frame_use = rk_aiq_frame_use_preview;
-    aeInputParams->flash_mode = rk_aiq_flash_mode_off;
-    aeInputParams->operation_mode = rk_aiq_ae_operation_mode_automatic;
-    aeInputParams->metering_mode = rk_aiq_ae_metering_mode_center;
-    aeInputParams->priority_mode = rk_aiq_ae_priority_mode_normal;
-    aeInputParams->flicker_reduction_mode = rk_aiq_ae_flicker_reduction_off;
-    aeInputParams->sensor_descriptor = &mSensorDescriptor;
-    aeInputParams->window = NULL;
-    aeInputParams->ev_shift = 0;
-    aeInputParams->manual_exposure_time_us = NULL;
-    aeInputParams->manual_analog_gain = NULL;
-    aeInputParams->manual_iso = NULL;
+    m3aWrapper->fillAeInputParams(&settings, aeInputParams);
 
-    return OK;
+    if (aeInputParams.aiqInputParams) {
+        /*
+         * apply the sensor limits reported from the exposure sensor descriptor
+         *
+         * The exposure sensor descriptor is updated every time we change sensor
+         * mode.
+         * Each sensor mode has associated a maximum fps. We should not let AE
+         * to produce values that drive the sensor at a higher speed.
+         *
+         * This operation is already done inside fillAeInputParams, but
+         * unfortunately the input parameter is an int
+         * (AeInputParams.maxSupportedFps) therefore we apply the limit here
+         * with more precision.
+         *
+         * In other PSL the AeInputParams.maxSupportedFps passed to 3A is coming
+         * from the reported min stream duration in static metadata.
+         *
+         * In our case we use the limit reported by the sensor mode selected.
+         * The value mMinSensorModeFrameTime is updated after every stream
+         * config.
+         */
+        rk_aiq_ae_input_params *aeParams = nullptr;
+        aeParams = &aeInputParams.aiqInputParams->aeInputParams;
+        aeParams->flicker_reduction_mode = rk_aiq_ae_flicker_reduction_off;
+        if (aeParams->manual_limits->manual_frame_time_us_min < mMinSensorModeFrameTime) {
+            aeParams->manual_limits->manual_frame_time_us_min = mMinSensorModeFrameTime;
+        }
+        if (aeParams->manual_limits->manual_frame_time_us_max < mMinSensorModeFrameTime) {
+            aeParams->manual_limits->manual_frame_time_us_max = mMinSensorModeFrameTime;
+        }
+    }
+
+    return status;
 }
 
 status_t
@@ -419,6 +483,7 @@ SettingsProcessor::handleNewSensorDescriptor(ControlUnit::Message &msg)
      * store the minimum frame time for this sensor mode.
      * This is the maximum fps that the sensor mode supports.
      * Use this to limit any frame rate requests from client.
+     * See fillAeInputParams() to understand how this value is used.
      * min frame duration is:
      *       pix_per_line * lines_per_frame
      *   ----------------------------------------
@@ -473,14 +538,17 @@ status_t
 SettingsProcessor::processAwbSettings(const CameraMetadata  &settings,
                                 RequestCtrlState &reqAiqCfg)
 {
-    rk_aiq_awb_input_params* awbInputParams;
-    awbInputParams = &reqAiqCfg.aiqInputParams.awbParams;
-    awbInputParams->frame_use = rk_aiq_frame_use_preview;
-    awbInputParams->scene_mode = rk_aiq_awb_operation_mode_auto;
-    awbInputParams->manual_cct_range = NULL;
-    awbInputParams->window = NULL;
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    status_t status = OK;
 
-    return OK;
+    AwbInputParams awbInputParams;
+    awbInputParams.aiqInputParams = &reqAiqCfg.aiqInputParams;
+    awbInputParams.aaaControls = &reqAiqCfg.aaaControls;
+
+    m3aWrapper->fillAwbInputParams(&settings,
+                                   awbInputParams);
+
+    return status;
 }
 
 status_t

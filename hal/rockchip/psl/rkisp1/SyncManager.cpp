@@ -122,12 +122,6 @@ status_t SyncManager::setSubdev(std::shared_ptr<MediaEntity> entity, sensorEntit
         }
         mIsysReceiverSubdev = subdev;
         break;
-    case SUBDEV_ISYSBACKEND:
-        if (entity->getType() != SUBDEV_GENERIC) {
-            LOGE("%s is not Isys receiver subdevice\n", entity->getName());
-        }
-        mIsysReceiverSubdev = subdev;
-        break;
     default:
         LOGE("Entity type (%d) not existing", type);
         return BAD_VALUE;
@@ -390,20 +384,13 @@ status_t SyncManager::handleMessageGetSensorModeData(Message &msg)
     status = mSensorOp->getVBlank(vBlank);
     desc->line_periods_vertical_blanking = vBlank > USHRT_MAX ? USHRT_MAX: vBlank;
 
-    int width, height, format;
-    status = mSensorOp->getSensorOutputSize(width, height, format);
-    desc->sensor_output_width = width;
-    desc->sensor_output_height = height;
-
-    LOG2("%s: pixel clock = %f  ppl = %d, lpf =%d, int_min = %d, int_max_range %d, width =%d, height =%d",
+    LOG2("%s: pixel clock = %f  ppl = %d, lpf =%d, int_min = %d, int_max_range %d",
                                     __FUNCTION__,
                                     desc->pixel_clock_freq_mhz,
                                     desc->pixel_periods_per_line,
                                     desc->line_periods_per_field,
                                     desc->coarse_integration_time_min,
-                                    desc->coarse_integration_time_max_margin,
-                                    desc->sensor_output_width,
-                                    desc->sensor_output_height);
+                                    desc->coarse_integration_time_max_margin);
 
     mMessageQueue.reply(MESSAGE_ID_GET_SENSOR_MODEDATA, status);
     return status;
@@ -437,16 +424,6 @@ status_t SyncManager::setParameters(std::shared_ptr<CaptureUnitSettings> &settin
 status_t SyncManager::handleMessageSetParams(Message &msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-    if (mQueuedSettings.size() > 0) {
-        std::vector<std::shared_ptr<CaptureUnitSettings>>::iterator it;
-        for (it = mQueuedSettings.begin(); it != mQueuedSettings.end(); ++it) {
-            if ((*it)->inEffectFrom == std::shared_ptr<CaptureUnitSettings>(msg.settings)->inEffectFrom) {
-                mQueuedSettings.erase(it);
-                it--;
-            }
-        }
-    }
-
     mQueuedSettings.push_back(msg.settings);
 
     return OK;
@@ -529,7 +506,7 @@ status_t SyncManager::handleMessageSOF(Message &msg)
     } else {
         mCurrentSettingIdentifier = mQueuedSettings[0]->settingsIdentifier;
         rk_aiq_exposure_sensor_parameters &expParams =
-          mQueuedSettings[0]->aiqResults.aeResults.sensor_exposure;
+          *mQueuedSettings[0]->aiqResults.aeResults.exposures[0].sensor_exposure;
 
         LOG2("Applying settings @exp_id %d in Effect @ %d",
                     msg.data.frameEvent.exp_id,
@@ -551,7 +528,7 @@ status_t SyncManager::handleMessageSOF(Message &msg)
                 break;
         }
 
-        /* status = mSensorOp->setTestPattern(mode); */
+        status = mSensorOp->setTestPattern(mode);
         CheckError((status != NO_ERROR), status, "@%s, Fail to set test pattern mode = %d [%d]!",
                     __FUNCTION__, mQueuedSettings[0]->testPatternMode, status);
 
@@ -561,12 +538,7 @@ status_t SyncManager::handleMessageSOF(Message &msg)
          * for stats.
          * Then remove it from the Q.
          */
-        // TODO: use frame idx for algo after stats rate meet out request
-        /* mQueuedSettings[0]->inEffectFrom = mQueuedSettings[0]->aiqResults.requestId; */
-        /* mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id + mExposureDelay; */
-        //need debug,the ineffectFrom should be the frame id + mExposureDelay,
-        //but if + mExposureDelay , the inEffect time beyond mExposureDelay
-        mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id;
+        mQueuedSettings[0]->inEffectFrom = msg.data.frameEvent.exp_id + mExposureDelay;
         mQueuedSettings.erase(mQueuedSettings.begin());
     }
 
@@ -609,8 +581,8 @@ status_t SyncManager::applySensorParams(rk_aiq_exposure_sensor_parameters &expPa
     status_t status = NO_ERROR;
     uint16_t aGain, dGain;
     // Frame duration
-    /* status |= mSensorOp->setFrameDuration(expParams.line_length_pixels, */
-    /*                                       expParams.frame_length_lines); */
+    status |= mSensorOp->setFrameDuration(expParams.line_length_pixels,
+                                          expParams.frame_length_lines);
     // gain
     mDelayedAGains.push_back(expParams.analog_gain_code_global);
     mDelayedDGains.push_back(expParams.digital_gain_global);
@@ -672,7 +644,7 @@ status_t SyncManager::handleMessageStart()
 
     if (!mQueuedSettings.empty()) {
         rk_aiq_exposure_sensor_parameters &expParams =
-                  mQueuedSettings[0]->aiqResults.aeResults.sensor_exposure;
+                  *mQueuedSettings[0]->aiqResults.aeResults.exposures[0].sensor_exposure;
 
         LOG1("Applying FIRST settings");
         status = applySensorParams(expParams);
@@ -951,7 +923,7 @@ status_t SyncManager::initSynchronization()
      * find the sub-device that represent the csi receiver, open it and keep a
      * reference in mIsysReceiverSubdev
      */
-    status = setMediaEntity("isys_backend", SUBDEV_ISYSBACKEND);
+    status = setMediaEntity("csi_receiver", SUBDEV_ISYSRECEIVER);
     if (CC_UNLIKELY(status != NO_ERROR)) {
         LOGE("Cannot find the isys csi-receiver");
         return UNKNOWN_ERROR;

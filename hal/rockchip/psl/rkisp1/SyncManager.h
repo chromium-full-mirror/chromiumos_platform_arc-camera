@@ -35,7 +35,6 @@
 #include "PollerThread.h"
 #include "CaptureUnitSettings.h"
 #include "Rk3aPlus.h"
-/* #include "Rk3aPlus.h" */
 #include "CaptureUnitSettings.h"
 #include "SensorHwOp.h"
 

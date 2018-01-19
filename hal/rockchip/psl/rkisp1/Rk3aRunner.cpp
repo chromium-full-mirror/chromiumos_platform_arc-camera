@@ -25,31 +25,55 @@
 #include <math.h>
 #include "LogHelper.h"
 #include "CameraMetadataHelper.h"
-#include "Rk3aPlus.h"
+#include "Rk3aCore.h"
 #include "RkAEStateMachine.h"
 #include "RkAFStateMachine.h"
 #include "RkAWBStateMachine.h"
 #include "LensHw.h"
-#include "RKISP1Common.h"
+#include "RKISP1Types.h"
 #include "SettingsProcessor.h"
+#include "RkAEStateMachine.h"
+#include "RkAWBStateMachine.h"
 
 
 namespace android {
 namespace camera2 {
 
+#define MIN3(a,b,c) MIN((a),MIN((b),(c)))
+
+static const float EPSILON = 0.00001;
+#define PRECAPTURE_ID_INVAL -1
 
 Rk3aRunner::Rk3aRunner(int camerId, Rk3aPlus *aaaWrapper, SettingsProcessor *settingsProcessor, LensHw *lensController) :
         mCameraId(camerId),
         m3aWrapper(aaaWrapper),
-        mAeState(nullptr)
+        mAeState(nullptr),
+        mAfState(nullptr),
+        mAwbState(nullptr),
+        mLensController(lensController),
+        mLastSaGain(1.0),
+        mSettingsProcessor(settingsProcessor),
+        mDigiGainOnSensor(false),
+        mPrecaptureResultRequestId(PRECAPTURE_ID_INVAL)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
+
+    CLEAR(mResizeLscGridR);
+    CLEAR(mResizeLscGridGr);
+    CLEAR(mResizeLscGridGb);
+    CLEAR(mResizeLscGridB);
+    CLEAR(mLscGridRGGB);
+    CLEAR(mLatestInputParams);
+
+    // init LscOffGrid to 1.0f
+    std::fill(std::begin(mLscOffGrid), std::end(mLscOffGrid), 1.0f);
 }
 
-status_t Rk3aRunner::init()
+status_t Rk3aRunner::init(bool digiGainOnSensor)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
 
+    mLatestInputParams.init();
     /*
      * Initialize the AE State Machine
      */
@@ -64,6 +88,10 @@ status_t Rk3aRunner::init()
      * Initialize the AWB State Machine
      */
     mAwbState = new RkAWBStateMachine(mCameraId);
+
+    mDigiGainOnSensor = digiGainOnSensor;
+
+    mLatestResults.init();
 
     return OK;
 }
@@ -98,6 +126,11 @@ status_t Rk3aRunner::run2A(RequestCtrlState &reqState, bool forceUpdated)
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
 
     status_t status = NO_ERROR;
+    int prevExposure = 0;
+    int prevIso = 0;
+    int currentExposure = 0;
+    int currentIso = 0;
+    uint8_t controlMode = reqState.aaaControls.controlMode;
 
     int reqId = reqState.request->getId();
     /*
@@ -129,6 +162,33 @@ status_t Rk3aRunner::run2A(RequestCtrlState &reqState, bool forceUpdated)
             LOGE("Run AE failed for request Id %d", reqId);
             return UNKNOWN_ERROR;
         }
+
+        /*
+          * Global Brightness and Contrast Enhancement
+          */
+        rk_aiq_gbce_input_params &gbceInput = reqState.aiqInputParams.gbceParams;
+
+        // in case of OFFMODE, bypass gbce (using standard gbce)
+        if (IS_CONTROL_MODE_OFF(controlMode))
+            gbceInput.gbce_level = rk_aiq_gbce_level_bypass;
+        else
+            gbceInput.gbce_level = rk_aiq_gbce_level_use_tuning;
+
+        gbceInput.frame_use = reqState.aiqInputParams.aeInputParams.frame_use;
+        gbceInput.ev_shift = reqState.aiqInputParams.aeInputParams.ev_shift;
+
+        status = m3aWrapper->runGbce(nullptr,
+                                     &reqState.aiqInputParams.gbceParams,
+                                     &reqState.captureSettings->aiqResults.gbceResults);
+
+        if (CC_UNLIKELY(status != OK)) {
+            LOGE("Run GBCE failed for request Id %d", reqId);
+            return UNKNOWN_ERROR;
+        }
+
+    } else {
+        m3aWrapper->deepCopyAEResults(&reqState.captureSettings->aiqResults.aeResults, &mLatestResults.aeResults);
+        m3aWrapper->deepCopyGBCEResults(&reqState.captureSettings->aiqResults.gbceResults, &mLatestResults.gbceResults);
     }
 
     status = mAwbState->processState(reqState.aaaControls.controlMode,
@@ -157,22 +217,108 @@ status_t Rk3aRunner::run2A(RequestCtrlState &reqState, bool forceUpdated)
     } else {
         reqState.captureSettings->aiqResults.awbResults = mLatestResults.awbResults;
     }
+    /*
+     * Parameter Adaptor RUN
+     */
+    // Prepare the rk_aiq_pa_input_params
+    rk_aiq_pa_input_params* paInput = &reqState.aiqInputParams.paParams;
+    paInput->awb_results = &reqState.captureSettings->aiqResults.awbResults;
+    rk_aiq_ae_results &aeResult = reqState.captureSettings->aiqResults.aeResults;
+    paInput->exposure_params = aeResult.exposures[0].exposure;
+    /*
+     * Do not apply digital gain through PA, due to one channel in HW being
+     * stuck at gain 1.0
+     */
+    paInput->color_gains = nullptr;
+    status = m3aWrapper->runPa(nullptr,
+                               paInput,
+                               &reqState.captureSettings->aiqResults.paResults);
+    if (CC_UNLIKELY(status != NO_ERROR)) {
+       LOGE("Failed to run PA for request of id %d", reqId);
+    }
 
-    status = m3aWrapper->runMisc(nullptr,
-                                 &reqState.aiqInputParams.miscParams,
-                                 &reqState.captureSettings->aiqResults.miscIspResults);
-    if (!CC_LIKELY(status == OK)) {
-        LOGE("Run misc failed for request Id %d", reqId);
-        return UNKNOWN_ERROR;
+    if (mLatestResults.aeResults.num_exposures > 0) {
+        prevExposure = mLatestResults.aeResults.exposures[0].exposure->exposure_time_us;
+        prevIso = mLatestResults.aeResults.exposures[0].exposure->iso;
+        currentExposure = aeResult.exposures[0].exposure->exposure_time_us;
+        currentIso = aeResult.exposures[0].exposure->iso;
+    }
+
+    if (reqState.aiqInputParams.blackLevelLock) {
+        if (prevExposure == currentExposure && prevIso == currentIso) {
+            // overwrite black level from previous (== "latest") results
+            reqState.captureSettings->aiqResults.paResults.black_level =
+                    mLatestResults.paResults.black_level;
+        } else {
+            // Exposure or iso value changed. Set lock to off for this request
+            LOG2("Set black level lock off");
+            reqState.blackLevelOff = true;
+        }
+    }
+
+    /*
+     * Shading Adaptor RUN
+     */
+    bool oldSAResultsCopied = false;
+    if (reqState.captureSettings->shadingMode != ANDROID_SHADING_MODE_OFF) {
+        rk_aiq_sa_input_params *saInput = &reqState.aiqInputParams.saParams;
+        saInput->awb_results = &reqState.captureSettings->aiqResults.awbResults;
+        saInput->frame_use = reqState.aiqInputParams.aeInputParams.frame_use;
+        saInput->sensor_frame_params = mSettingsProcessor->getCurrentFrameParams();
+        status = m3aWrapper->runSa(nullptr,
+                                   saInput,
+                                   &reqState.captureSettings->aiqResults.saResults,
+                                   forceUpdated);
+        if (CC_UNLIKELY(status != NO_ERROR)) {
+            LOGE("Failed to run SA for request of id %d", reqId);
+        }
+
+        if (!reqState.captureSettings->aiqResults.saResults.lsc_update &&
+            mLatestResults.saResults.lsc_update == true) {
+            // copy the old lsc table, if there was no update and we have an old
+            m3aWrapper->deepCopySAResults(&reqState.captureSettings->aiqResults.saResults,
+                                          &mLatestResults.saResults);
+            // but don't claim that it is updated
+            reqState.captureSettings->aiqResults.saResults.lsc_update = false;
+            oldSAResultsCopied = true;
+        }
+    }
+
+    if (mDigiGainOnSensor == false) {
+        /*
+         * Apply the digital gain. It has to be injected to SA results, and we need
+         * to consider the fact that we might use old LSC which already has digital
+         * gain applied to it.
+         */
+        float digitalGain = aeResult.exposures[0].exposure->digital_gain;
+
+        if (oldSAResultsCopied && mLastSaGain > EPSILON) {
+            // do not apply dg twice, so remove the last applied
+            digitalGain /= mLastSaGain;
+        } else if (!oldSAResultsCopied) {
+            // save gain applied on next mLatest saResult
+            mLastSaGain = digitalGain;
+        }
+
+        applyDigitalGain(reqState, digitalGain);
+    }
+
+    status = applyTonemaps(reqState);
+    if (CC_UNLIKELY(status != OK)) {
+        LOGE("Failed to apply tonemaps for request id %d", reqId);
     }
 
     /*
      * Result processing before we send them to HW
      */
 
+    processSAResults(reqState);
+
     processAeResults(reqState);
 
     processAwbResults(reqState);
+
+    updateNeutralColorPoint(reqState);
 
     return status;
 }
@@ -301,11 +447,24 @@ status_t Rk3aRunner::processAeResults(RequestCtrlState &reqState)
         reqState.captureSettings->aiqResults.aeResults;
 
     LOG2("%s exp_time=%d gain=%f", __FUNCTION__,
-            aeResult.exposure.exposure_time_us,
-            aeResult.exposure.analog_gain);
+            aeResult.exposures->exposure->exposure_time_us,
+            aeResult.exposures->exposure->analog_gain);
 
     mAeState->processResult(aeResult, *reqState.ctrlUnitResult,
                             reqState.request->getId());
+
+    uint8_t intent = reqState.intent;
+    // use the precapture settings, if they are available, and if they are recent
+    if (mPrecaptureResults.aeResults.exposures->sensor_exposure->coarse_integration_time != 0 &&
+        reqState.request->getId() <= mPrecaptureResultRequestId + PRECAP_TIME_ALIVE) {
+
+        if (intent == ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE ||
+                intent == ANDROID_CONTROL_CAPTURE_INTENT_VIDEO_SNAPSHOT) {
+            LOG2("@%s: copy precapture settings", __FUNCTION__);
+            m3aWrapper->deepCopyAiqResults(reqState.captureSettings->aiqResults, mPrecaptureResults);
+            mPrecaptureResults.init();
+        }
+    }
 
     //# ANDROID_METADATA_Dynamic android.control.aeRegions done
     reqState.ctrlUnitResult->update(ANDROID_CONTROL_AE_REGIONS,
@@ -321,7 +480,6 @@ status_t Rk3aRunner::processAeResults(RequestCtrlState &reqState)
                                     &exposureCompensation,
                                     1);
     return OK;
-
 }
 
 /**
@@ -429,6 +587,18 @@ status_t Rk3aRunner::processAfResults(RequestCtrlState &reqState)
         }
     }
 
+    /**
+     *  Send the results to the Hardware(Lens controller)
+     */
+    if (aiqResults.afResults.lens_driver_action == rk_aiq_lens_driver_action_move_to_unit) {
+        if (CC_UNLIKELY(mLensController != nullptr)) {
+           status = mLensController->moveFocusToPosition(aiqResults.afResults.next_lens_position);
+           if (CC_UNLIKELY(status != OK)) {
+               LOGE("AF Failed to move the lens to position %d",
+                       aiqResults.afResults.next_lens_position);
+           }
+        }
+    }
     // TODO: remove this once the request flow is fixed
     mLatestResults.afResults = aiqResults.afResults;
 
@@ -458,6 +628,58 @@ status_t Rk3aRunner::processAfTriggers(RequestCtrlState &reqAiqCfg)
         afInputParams);
 }
 
+status_t Rk3aRunner::processSAResults(RequestCtrlState &reqState)
+{
+    status_t status = OK;
+    if (reqState.captureSettings->shadingMapMode ==
+        ANDROID_STATISTICS_LENS_SHADING_MAP_MODE_ON) {
+
+        Rk3aPlus::LSCGrid resizeGrid;
+        resizeGrid.width = mSettingsProcessor->getLSCMapWidth();
+        resizeGrid.height = mSettingsProcessor->getLSCMapHeight();
+        if (reqState.captureSettings->aiqResults.saResults.lsc_update) {
+            Rk3aPlus::LSCGrid inputGrid;
+            rk_aiq_sa_results &sar = reqState.captureSettings->aiqResults.saResults;
+            inputGrid.gridB = sar.channel_b;
+            inputGrid.gridR = sar.channel_r;
+            inputGrid.gridGr = sar.channel_gr;
+            inputGrid.gridGb = sar.channel_gb;
+            inputGrid.width = sar.width;
+            inputGrid.height = sar.height;
+
+            Rk3aPlus::LSCGrid resizeGrid;
+            resizeGrid.gridB = mResizeLscGridB;
+            resizeGrid.gridR = mResizeLscGridR;
+            resizeGrid.gridGr = mResizeLscGridGr;
+            resizeGrid.gridGb = mResizeLscGridGb;
+
+            Rk3aPlus::storeLensShadingMap(inputGrid, resizeGrid, mLscGridRGGB);
+        }
+
+        // todo remove fix too small values from algorithm
+        size_t size = resizeGrid.width * resizeGrid.height * 4;
+        size_t errCount = 0;
+        for (size_t i = 0; i < size; i++) {
+            if (mLscGridRGGB[i] < 1.0f) {
+                mLscGridRGGB[i] = 1.0f;
+                errCount++;
+            }
+        }
+        if (errCount) {
+            LOGE("Error - SA produced too small values (%zu/%zu)!", errCount, size);
+            status = BAD_VALUE;
+        }
+
+        bool lscOn = (reqState.captureSettings->shadingMode != ANDROID_SHADING_MODE_OFF);
+        const float *lscMap = lscOn ? mLscGridRGGB : mLscOffGrid;
+        reqState.ctrlUnitResult->update(ANDROID_STATISTICS_LENS_SHADING_MAP,
+                                        lscMap,
+                                        size);
+    }
+
+    return status;
+}
+
 /**
  * Generic results handler which runs after AWB has run. At this point of time
  * we can modify the results before we send them towards the HW (sensor/ISP)
@@ -473,13 +695,271 @@ status_t Rk3aRunner::processAwbResults(RequestCtrlState &reqState)
         return UNKNOWN_ERROR;
     }
     status_t status = OK;
+    AAAControls &controls = reqState.aaaControls;
+    rk_aiq_pa_results &paResults = reqState.captureSettings->aiqResults.paResults;
+
+    if (controls.awb.awbMode == ANDROID_CONTROL_AWB_MODE_OFF &&
+        controls.awb.colorCorrectionMode == ANDROID_COLOR_CORRECTION_MODE_TRANSFORM_MATRIX) {
+        /*
+         * Overwrite the PA results if client provided its own color gains
+         * and color conversion matrix
+         */
+        paResults.color_gains = reqState.aiqInputParams.manualColorGains;
+        MEMCPY_S(paResults.color_conversion_matrix,
+            sizeof(paResults.color_conversion_matrix),
+            reqState.aiqInputParams.manualColorTransform,
+            sizeof(reqState.aiqInputParams.manualColorTransform));
+        paResults.preferred_acm = nullptr;
+
+    }
 
     status = mAwbState->processResult(reqState.captureSettings->aiqResults.awbResults,
                                       *reqState.ctrlUnitResult);
 
     return status;
-
 }
+
+/*
+ * Tonemap conversions or overwrites for CONTRAST_CURVE, GAMMA_VALUE, and
+ * PRESET_CURVE modes
+ */
+status_t Rk3aRunner::applyTonemaps(RequestCtrlState &reqState)
+{
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    status_t status = OK;
+
+    /*
+     * Normal use-case is the automatic modes, and we need not do anything here
+     */
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_FAST ||
+        reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_HIGH_QUALITY) {
+        // automatic modes, gbce output is used as-is
+        return OK;
+    }
+
+    rk_aiq_gbce_results &results = reqState.captureSettings->aiqResults.gbceResults;
+    int lutSize = results.gamma_lut_size;
+
+    /*
+     * Sanity check. If gbce isn't producing a lut, we can't overwrite it.
+     */
+    if (lutSize <= 0) {
+        LOGE("Bad gamma lut size (%d) in gbce results", lutSize);
+        return UNKNOWN_ERROR;
+    }
+
+    /*
+     * Contrast curve mode. Since RKISP1 can't really support separate color
+     * channel tonemaps, we can't fully support contrast curve. This hacky
+     * implementation is just to satisfy one ITS test, other ITS tests are smart
+     * enough to figure out that they should test against MODE_GAMMA_VALUE, when
+     * CONTRAST_CURVE is not reported as supported. Alternatively CTS2 should
+     * check that CONTRAST_CURVE is supported - which it does not do for FULL
+     * capability devices. CTS2 is fine with just GAMMA_VALUE.
+     */
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_CONTRAST_CURVE) {
+        float *srcR = reqState.rGammaLut;
+        float *srcG = reqState.gGammaLut;
+        float *srcB = reqState.bGammaLut;
+        size_t srcLenR = reqState.rGammaLutSize;
+        size_t srcLenG = reqState.gGammaLutSize;
+        size_t srcLenB = reqState.bGammaLutSize;
+
+        if (srcLenR >= 4 && (srcLenR == srcLenG) && (srcLenR == srcLenB)) {
+            // The Android tonemap is 2d, but here we assume the input values to
+            // be linearly spaced. If they are not, well, our broken
+            // implementation is just a bit more broken.
+
+            // allocate a linear spaced lut for half the input size, discarding
+            // in-values
+            size_t srcLutSize = srcLenG / 2;
+            float srcLut[srcLutSize];
+            // pick the out-values in srcLut, skip the in-values, calculate sums
+            float sumR = 0;
+            float sumG = 0;
+            float sumB = 0;
+            for (size_t i = 0; i < srcLutSize; i++) {
+                int srcIndex = i * 2 + 1;
+                srcLut[i] = srcG[srcIndex];
+                sumR += srcR[srcIndex];
+                sumG += srcG[srcIndex];
+                sumB += srcB[srcIndex];
+            }
+
+            // calculate averages
+            float averageR = sumR / srcLutSize;
+            float averageG = sumG / srcLutSize;
+            float averageB = sumB / srcLutSize;
+
+            float minAverage = MIN3(averageR, averageG, averageB);
+
+            if (minAverage > EPSILON) {
+                // adjust gains to try to mimic per-channel controls a bit
+                reqState.aiqInputParams.manualColorGains.r  *= (averageR / minAverage);
+                reqState.aiqInputParams.manualColorGains.gr *= (averageG / minAverage);
+                reqState.aiqInputParams.manualColorGains.gb *= (averageG / minAverage);
+                reqState.aiqInputParams.manualColorGains.b  *= (averageB / minAverage);
+            }
+
+            // interpolate to result lut, using the G channel srcLut
+            interpolateArray(srcLut, srcLutSize, results.g_gamma_lut, lutSize);
+        }
+    }
+
+    /*
+     * Gamma value and preset curve modes. Generated on the fly based on the
+     * current lut size.
+     */
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_GAMMA_VALUE) {
+        float gamma = reqState.captureSettings->gammaValue;
+        if (fabs(gamma) >= EPSILON) {
+            for (int i = 0; i < lutSize; i++) {
+                results.g_gamma_lut[i] = pow(i / float(lutSize), 1 / gamma);
+            }
+        } else {
+            LOGE("Bad gamma");
+            status = BAD_VALUE;
+        }
+    }
+
+    if (reqState.captureSettings->tonemapMode == ANDROID_TONEMAP_MODE_PRESET_CURVE) {
+        if (reqState.captureSettings->presetCurve == ANDROID_TONEMAP_PRESET_CURVE_SRGB) {
+            for (int i = 0; i < lutSize; i++) {
+                if (i / (lutSize -1)  < 0.0031308)
+                    results.g_gamma_lut[i] = 12.92 * (i / (lutSize -1));
+                else
+                    results.g_gamma_lut[i] = 1.055 * pow(i / float(lutSize - 1), 1 / 2.4) - 0.055;
+            }
+        }
+        if (reqState.captureSettings->presetCurve == ANDROID_TONEMAP_PRESET_CURVE_REC709) {
+            for (int i = 0; i < lutSize; i++) {
+                if (i / (lutSize - 1) < 0.018)
+                    results.g_gamma_lut[i] = 4.5 * (i / (lutSize -1));
+                else
+                    results.g_gamma_lut[i] = 1.099 * pow(i / float(lutSize - 1), 0.45) - 0.099;
+            }
+        }
+    }
+
+    // make all luts the same with memcpy, hw only really supports one
+    MEMCPY_S(results.b_gamma_lut, lutSize * sizeof(float),
+        results.g_gamma_lut, lutSize * sizeof(float));
+    MEMCPY_S(results.r_gamma_lut, lutSize * sizeof(float),
+        results.g_gamma_lut, lutSize * sizeof(float));
+
+    return status;
+}
+
+inline float Rk3aRunner::interpolate(float pos, const float *src, int srcSize) const
+{
+    if (pos <= 0)
+        return src[0];
+
+    if (pos >= srcSize - 1)
+        return src[srcSize - 1];
+
+    int i = int(pos);
+
+    return src[i] + (pos - i) * (src[i + 1] - src[i]);
+}
+
+void Rk3aRunner::interpolateArray(const float *src, int srcSize, float *dst, int dstSize) const
+{
+    if (src == nullptr || dst == nullptr || srcSize < 2 || dstSize < 2) {
+        LOGE("Bad input for array interpolation");
+        return;
+    }
+
+    float step = float(srcSize - 1) / (dstSize - 1);
+    for (int i = 0; i < dstSize; i++){
+        dst[i] = interpolate(i * step, src, srcSize);
+    }
+}
+
+
+/**
+ * This function calculates the Neutral Color Point based on previously
+ * calculated AWB results. The Neutral Color Point is returned as a dynamic
+ * tag to the framework.
+ *
+ * \param[in,out] reqCfg AWB Results (in), Neutral Color Point (out)
+ */
+status_t Rk3aRunner::updateNeutralColorPoint(RequestCtrlState &reqAiqCfg)
+{
+    LOG2("@%s", __FUNCTION__);
+    float whitePoint[] = { 1.0, 1.0, 1.0 };
+    int tableSize = sizeof(whitePoint) / sizeof(float);
+
+    rk_aiq_awb_results &awbResults =
+                reqAiqCfg.captureSettings->aiqResults.awbResults;
+
+    if (fabs(awbResults.final_r_per_g) > EPSILON &&
+        fabs(awbResults.final_b_per_g) > EPSILON) {
+        // color order defined by Android: R,G,B
+        float max_chroma = MAX(MAX(awbResults.final_r_per_g, 1.0),
+                                   awbResults.final_b_per_g);
+        whitePoint[0] = max_chroma / awbResults.final_r_per_g;
+        whitePoint[1] = max_chroma;
+        whitePoint[2] = max_chroma / awbResults.final_b_per_g;
+        LOG2("white point RGB(%f, %f, %f)",
+             whitePoint[0], whitePoint[1], whitePoint[2]);
+    }
+
+    camera_metadata_rational_t neutralColorPoint[tableSize];
+    for (int i = 0; i < tableSize; i++) {
+        neutralColorPoint[i].numerator = whitePoint[i];
+        neutralColorPoint[i].denominator = 1;
+    }
+
+    reqAiqCfg.ctrlUnitResult->update(ANDROID_SENSOR_NEUTRAL_COLOR_POINT,
+                                     neutralColorPoint, tableSize);
+    //# ANDROID_METADATA_Dynamic android.sensor.neutralColorPoint done
+
+    return NO_ERROR;
+}
+
+void Rk3aRunner::applyDigitalGain(RequestCtrlState &reqState, float digitalGain) const
+{
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    rk_aiq_sa_results &saResults = reqState.captureSettings->aiqResults.saResults;
+    uint32_t lscSize = saResults.width * saResults.height;
+    for (uint32_t i = 0; i < lscSize; i++) {
+        saResults.channel_b[i]  *= digitalGain;
+        saResults.channel_r[i]  *= digitalGain;
+        saResults.channel_gb[i] *= digitalGain;
+        saResults.channel_gr[i] *= digitalGain;
+    }
+}
+
+status_t Rk3aRunner::allocateLscTable(int tableSize)
+{
+    if (tableSize <= 0) {
+        LOGE("Allocate LSC table failed");
+        return BAD_VALUE;
+    }
+
+    status_t status = mLatestResults.allocateLsc(tableSize);
+    status |= mPrecaptureResults.allocateLsc(tableSize);
+    mPrecaptureResults.init();
+    mLatestResults.init();
+    initLsc(mPrecaptureResults, tableSize);
+    initLsc(mLatestResults, tableSize);
+
+    return status;
+}
+
+void Rk3aRunner::initLsc(AiqResults &results, uint32_t lscSize) const
+{
+    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
+    rk_aiq_sa_results &saResults = results.saResults;
+    for (uint32_t i = 0; i < lscSize; i++) {
+        saResults.channel_b[i]  = 1.0f;
+        saResults.channel_r[i]  = 1.0f;
+        saResults.channel_gb[i] = 1.0f;
+        saResults.channel_gr[i] = 1.0f;
+    }
+}
+
 
 } /* namespace camera2 */
 } /* namespace android */

@@ -303,10 +303,6 @@ void GraphConfigManager::handleMap(camera3_stream_t* stream, ResolutionItem& res
     bool rotate = stream->stream_type == CAMERA3_STREAM_OUTPUT &&
                   (stream->crop_rotate_scale_degrees == CAMERA3_STREAM_ROTATION_90
                    || stream->crop_rotate_scale_degrees == CAMERA3_STREAM_ROTATION_270);
-
-    //HACK: by zyc
-    rotate = false;
-
     mQuery[w] = std::to_string(rotate ? stream->height : stream->width);
     mQuery[h] = std::to_string(rotate ? stream->width : stream->height);
 }
@@ -399,11 +395,7 @@ status_t GraphConfigManager::mapStreamToKey(const std::vector<camera3_stream_t*>
     }
 
     if (blobNum && !isVideoSnapshot) {
-
-        //HACK: Force use video
-        //TODO: Fix xml(add missing entries for still)
-        needEnableStill = false;
-
+        needEnableStill = true;
         LOGD("@%s, it has BLOB, needEnableStill:%d", __FUNCTION__, needEnableStill);
     }
 
@@ -481,16 +473,13 @@ status_t GraphConfigManager::configStreams(const vector<camera3_stream_t*> &stre
         LOGE("@%s, call mapStreamToKey fail, ret:%d", __FUNCTION__, ret);
         return ret;
     }
-
-
     // W/A: Only support 2 streams in GC due to ISP pipe outputs.
     int streamNum = (streams.size() > 2) ? 2 : streams.size();
-
     mQuery[streamCount] = std::to_string(streamNum);
     // W/A: only pv node is used due to FOV issue,
     // so here consider one stream only for still case
     if(needEnableStill) {
-        mQuery[streamCount] = std::to_string(1);
+       mQuery[streamCount] = std::to_string(1);
     }
 
     /**
@@ -549,11 +538,6 @@ status_t GraphConfigManager::configStreams(const vector<camera3_stream_t*> &stre
         return UNKNOWN_ERROR;
     }
 
-    /**
-     * since we map the max res stream to video, and the little one to preview, so
-     * swapVideoPreview here is always false,  by the way, please make sure
-     * the video or still stream size >= preview stream size in graph_settings_<sensor name>.xml, zyc.
-     */
     bool swapVideoPreview = needSwapVideoPreview(mFirstQueryResults[0], id);
     gc->setMediaCtlConfig(mMediaCtl, swapVideoPreview, needEnableStill);
 

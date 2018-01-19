@@ -58,22 +58,19 @@ namespace gcu = graphconfig::utils;
 #define MEDIACTL_PAD_PV_NUM 4
 #define SCALING_FACTOR 1
 
-const string csi2_without_port = "rockchip-sy-mipi-dphy";
+const string csi2_without_port = "rkisp1-csi2 ";
 
-/* isp port name*/
 const string MEDIACTL_INPUTNAME = "input";
-const string MEDIACTL_OUTPUTNAME = "output";
 
-/*video entity name*/
-const string MEDIACTL_PARAMETERNAME = "rkisp1-input-params";
+const string MEDIACTL_PARAMETERNAME = "parameters";
 
-const string MEDIACTL_VIDEONAME = "rkisp1_mainpath";
-const string MEDIACTL_STILLNAME = "rkisp1_mainpath";
+const string MEDIACTL_VIDEONAME = "output";
+const string MEDIACTL_STILLNAME = "output";
 
-const string MEDIACTL_PREVIEWNAME = "rkisp1_selfpath";
+const string MEDIACTL_PREVIEWNAME = "viewfinder";
 const string MEDIACTL_POSTVIEWNAME = "postview";
 
-const string MEDIACTL_STATNAME = "rkisp1-statistics";
+const string MEDIACTL_STATNAME = "3a stat";
 
 GraphConfig::GraphConfig() :
         mManager(nullptr),
@@ -1822,7 +1819,6 @@ status_t GraphConfig::parseSensorNodeInfo(Node* sensorNode,
         LOGE("Error: Couldn't get values from sensor");
         return UNKNOWN_ERROR;
     }
-
     ret = sensorNode->getValue(GCSS_KEY_INTERLACED, tmp);
     if (ret != css_err_none) {
         LOGW("Couldn't get interlaced field from sensor");
@@ -1853,17 +1849,13 @@ status_t GraphConfig::parseSensorNodeInfo(Node* sensorNode,
                                                           tmp[2], tmp[3]));
     // Imgu format. The tool and getMBusFormat is not in sync.
     if (tmp == "RA10" || tmp == "RG10") {
-        info.output.mbusFormat = MEDIA_BUS_FMT_SGBRG10_1X10;
+        info.output.mbusFormat = MEDIA_BUS_FMT_SRGGB10_1X10;
     } else if (tmp == "BA10" || tmp == "BG10") {
         info.output.mbusFormat = MEDIA_BUS_FMT_SGRBG10_1X10;
-    } else if (tmp == "GR10") {
-        info.output.mbusFormat = MEDIA_BUS_FMT_SBGGR10_1X10;
-
-    } else if (tmp == "GB10") {
-        info.output.mbusFormat = MEDIA_BUS_FMT_SRGGB10_1X10;
     } else {
         LOGE("Error: No valid format set in the settings.");
     }
+
     /*
      * Get size and cropping from pixel array to use in format and selection
      */
@@ -1885,6 +1877,7 @@ status_t GraphConfig::parseSensorNodeInfo(Node* sensorNode,
     }
 
     info.pa.name = info.name+ " " + info.i2cAddress;
+
     /* Populate the formats for each subdevice
      * The format for the Pixel Array is determined by the native bayer order
      * and the bpp selected by the settings.
@@ -1896,6 +1889,7 @@ status_t GraphConfig::parseSensorNodeInfo(Node* sensorNode,
      * */
     int32_t bpp = gcu::getBpp(info.output.mbusFormat);
     info.pa.out.mbusFormat = gcu::getMBusFormat(info.nativeBayer, bpp);
+
     return OK;
 }
 
@@ -1967,16 +1961,8 @@ status_t GraphConfig::getMediaCtlData(MediaCtlConfig *mediaCtlConfig)
         }
 
         // get csi2 and cio2 names
-        //csi2 = csi2_without_port + std::to_string(port);
-        //mCSIBE = CSI_BE + std::to_string(port);
-        csi2 = csi2_without_port;
-        mCSIBE = CSI_BE;
-        /* TODO: should config according to real topology, sensor to isp link is decided by the sensor interface,
-        * link is different for mipi and dvp.
-        *  mipi sensor --- > csi ---> isp
-        * dvp sensor ----> isp
-        */
-        addLinkParams(entityName, 0, csi2, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
+        csi2 = csi2_without_port + std::to_string(port);
+        mCSIBE = CSI_BE + std::to_string(port);
         LOG1(" csi2 is:%s, cio2 is:%s\n", csi2.c_str(), mCSIBE.c_str());
     } else {
         LOGE("Error: No source");
@@ -2155,12 +2141,8 @@ status_t GraphConfig::getMediaCtlData(MediaCtlConfig *mediaCtlConfig)
     addFormatParams(sourceInfo.pa.name, sourceInfo.output.w, sourceInfo.output.h, 0, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
 
     // rkisp1-csi2 0 or 1
-    addFormatParams(csi2, csiBESocOutW, csiBESocOutH, 0, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
-    addFormatParams(csi2, csiBESocOutW, csiBESocOutH, 1, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
-
-    // Imgu cio2 format
-    //TODO,zyc
-   // addFormatParams(mCSIBE, csiBEOutW, csiBEOutH, 0, V4L2_PIX_FMT_RKISP1_SGRBG10, 0, mediaCtlConfig);
+    addFormatParams(csi2, csiBEOutW, csiBEOutH, 0, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
+    addFormatParams(csi2, csiBEOutW, csiBEOutH, 1, sourceInfo.output.mbusFormat, 0, mediaCtlConfig);
 
     /* Start populating selections into mediaCtlConfig
      * entity name, width, height, left crop, top crop, target, pad, config */
@@ -2170,6 +2152,14 @@ status_t GraphConfig::getMediaCtlData(MediaCtlConfig *mediaCtlConfig)
                        sourceInfo.pa.out.l,
                        sourceInfo.pa.out.t,
                        V4L2_SEL_TGT_CROP, 0 /* sink pad */, mediaCtlConfig);
+
+    /*
+     * Add video nodes into mediaCtlConfig
+     */
+    addVideoNodes(csiBESocOutput, mediaCtlConfig);
+
+    LOG1("Adding Isys link %s:[0] -> %s:[0]", sourceInfo.pa.name.c_str(), csi2.c_str());
+    addLinkParams(sourceInfo.pa.name, 0, csi2, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
 
     if (gDumpType & CAMERA_DUMP_MEDIA_CTL)
         dumpMediaCtlConfig(*mediaCtlConfig);
@@ -2226,10 +2216,9 @@ status_t GraphConfig::getImguMediaCtlData(MediaCtlConfig *mediaCtlConfig,
     int ret;
 
     Node *imgu = nullptr;
-    Node *preview = nullptr, *video = nullptr, *still = nullptr, *output = nullptr, *input = nullptr;
     int width = 0, height = 0, format = 0;
     int enabled = 1;
-    std::string kImguName = "rkisp1-isp-subdev";
+    std::string kImguName = "rkisp1-imgu";
 
     ret = mSettings->getDescendant(GCSS_KEY_IMGU, &imgu);
     if (ret != css_err_none) {
@@ -2237,38 +2226,12 @@ status_t GraphConfig::getImguMediaCtlData(MediaCtlConfig *mediaCtlConfig,
         return UNKNOWN_ERROR;
     }
 
-    // TODO: not done
-    mSettings->getDescendant(GCSS_KEY_IMGU_PREVIEW, &preview);
-    mSettings->getDescendant(GCSS_KEY_IMGU_VIDEO, &video);
-    mSettings->getDescendant(GCSS_KEY_IMGU_STILL, &still);
-    imgu->getDescendant(GCSS_KEY_OUTPUT, &output);
-    imgu->getDescendant(GCSS_KEY_INPUT, &input);
+    for (size_t i = 0; i < mLut.size(); i++) {
+        Node *pipe = nullptr;
+        ret = imgu->getDescendant(mLut[i].uid, &pipe);
 
-    struct lut {
-        uint32_t uid;
-        string name;
-        int ipuNodeName;
-        Node *pipe;
-        int pad;
-    };
-
-    vector<lut> uids;
-    uids.clear();
-
-    uids = {
-        { GCSS_KEY_IMGU_STILL, MEDIACTL_STILLNAME, IMGU_NODE_STILL, still, -1 },
-        { GCSS_KEY_INPUT, kImguName, IMGU_NODE_INPUT,input, 0 },
-        { GCSS_KEY_OUTPUT, kImguName, -1, output, MEDIACTL_PAD_OUTPUT_NUM },
-        { GCSS_KEY_IMGU_VIDEO, MEDIACTL_VIDEONAME, IMGU_NODE_VIDEO, video, 0 },
-        { GCSS_KEY_IMGU_PREVIEW, MEDIACTL_PREVIEWNAME, IMGU_NODE_VF_PREVIEW, preview, 0 },
-    };
-
-    for (int i = 0; i < uids.size(); i++) {
-        string name = uids[i].name;
-        Node *pipe = uids[i].pipe;
-
-        if (pipe == nullptr) {
-            LOGD("<%u> node is not present in graph (descriptor or settings) - continuing.", uids[i].uid);
+        if (ret != css_err_none) {
+            LOGD("<%u> node is not present in graph (descriptor or settings) - continuing.", mLut[i].uid);
             continue;
         }
 
@@ -2305,85 +2268,99 @@ status_t GraphConfig::getImguMediaCtlData(MediaCtlConfig *mediaCtlConfig,
             return UNKNOWN_ERROR;
         }
 
-        LOG1("fourccFormat = %s", fourccFormat.c_str());
-        format = gcu::getV4L2Format(get_fourcc(fourccFormat[0],
-                                               fourccFormat[1],
-                                               fourccFormat[2],
-                                               fourccFormat[3]));
-
-        if (GCSS::ItemUID::key2str(uids[i].uid) == GC_PREVIEW ||
-            GCSS::ItemUID::key2str(uids[i].uid) == GC_STILL ||
-            GCSS::ItemUID::key2str(uids[i].uid) == GC_VIDEO) {
-            int nodeWidth = 0, nodeHeight = 0;
-
-            addFormatParams(name, width, height, uids[i].pad,
-                            format, 0, mediaCtlConfig);
-
-            // Get path crop  info
-            ret = getNodeInfo(GCSS_KEY_IMGU_PCRP, *pipe, &nodeWidth, &nodeHeight);
-            if (ret != OK) {
-                LOGE("pipe log name: %s can't get info!", name.c_str());
-                return UNKNOWN_ERROR;
-            } else {
-                struct v4l2_selection select;
-                CLEAR(select);
-                /* videodev2.h says don't use *_MPLAEN */
-                select.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-                select.target = V4L2_SEL_TGT_CROP;
-                select.flags = 0;
-                select.r.left = 0;
-                select.r.top = 0;
-                select.r.width = nodeWidth;
-                select.r.height = nodeHeight;
-                addSelectionVideoParams(name.c_str(), select, mediaCtlConfig);
-                LOG2("pipe log name: %s  crop size %dx%d", name.c_str(), nodeWidth, nodeHeight);
-            }
-
-            LOG2("Adding video node: %s", NODE_NAME(pipe));
-            addImguVideoNode(uids[i].ipuNodeName, name, mediaCtlConfig);
-            addLinkParams(kImguName, MEDIACTL_PAD_OUTPUT_NUM, name, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
-        } else if (GCSS::ItemUID::key2str(uids[i].uid) == GC_INPUT) {
-            int nodeWidth = 0, nodeHeight = 0;
-            int32_t iMbusFormat = gcu::getMBusFormat(get_fourcc(fourccFormat[0],
-                                                                fourccFormat[1],
-                                                                fourccFormat[2],
-                                                                fourccFormat[3]));
-            addFormatParams(name, width, height, uids[i].pad,
-                            iMbusFormat, 0, mediaCtlConfig);
-
-            // Get isp input crop  info
-            ret = getNodeInfo(GCSS_KEY_IMGU_IAC, *pipe, &nodeWidth, &nodeHeight);
-            if (ret != OK) {
-                LOGW("pipe log name: %s can't get info!", name.c_str());
-                return UNKNOWN_ERROR;
-            } else
-                addSelectionParams(name, nodeWidth, nodeHeight, 0, 0, V4L2_SEL_TGT_CROP, uids[i].pad, mediaCtlConfig);
-            /* TODO: related to sensor interface, see getMediaCtlData*/
-            addLinkParams(mCSIBE, 1, kImguName, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
-        } else if (GCSS::ItemUID::key2str(uids[i].uid) == GC_OUTPUT) {
-            int nodeWidth = 0, nodeHeight = 0;
-            int32_t oMbusFormat = gcu::getMBusFormat(get_fourcc(fourccFormat[0],
-                                                                fourccFormat[1],
-                                                                fourccFormat[2],
-                                                                fourccFormat[3]));
-            addFormatParams(name, width, height, uids[i].pad,
-                            oMbusFormat, 0, mediaCtlConfig);
-            // Get isp output crop  info
-            ret = getNodeInfo(GCSS_KEY_IMGU_ISM, *pipe, &nodeWidth, &nodeHeight);
-            if (ret != OK) {
-                LOGW("pipe log name: %s can't get info!", name.c_str());
-                return UNKNOWN_ERROR;
-            } else
-                addSelectionParams(name, nodeWidth, nodeHeight, 0, 0, V4L2_SEL_TGT_CROP, uids[i].pad, mediaCtlConfig);
-        } else {
-            LOGE("pipe log name: wrong node %s !", GCSS::ItemUID::key2str(uids[i].uid));
+        if (fourccFormat == "NV12")
+            format = V4L2_PIX_FMT_NV12;
+        else if (fourccFormat == "YUYV")
+            format = V4L2_PIX_FMT_YUYV;
+        else
             return UNKNOWN_ERROR;
+
+        if (mLut[i].uidStr == GC_PREVIEW ||
+            mLut[i].uidStr == GC_STILL ||
+            mLut[i].uidStr == GC_VIDEO) {
+
+            int nodeWidth = 0, nodeHeight = 0;
+
+            // Get GDC info
+            ret = getNodeInfo(GCSS_KEY_IMGU_GDC, *pipe, &nodeWidth, &nodeHeight);
+            if (ret != OK) {
+                LOGE("pipe log name: %s can't get info!", mLut[i].nodeName.c_str());
+                return UNKNOWN_ERROR;
+            }
+            LOG2("pipe log name: %s  gdc size %dx%d", mLut[i].nodeName.c_str(), nodeWidth, nodeHeight);
+            addFormatParams(kImguName, nodeWidth, nodeHeight, 0,
+                                     V4L2_MBUS_FMT_UYVY8_2X8, 0, mediaCtlConfig);
+
+            // Get IF info
+            ret = getNodeInfo(GCSS_KEY_IMGU_IF, *pipe, &nodeWidth, &nodeHeight);
+            if (ret != OK) {
+                LOGE("pipe log name: %s can't get info!", mLut[i].nodeName.c_str());
+                return UNKNOWN_ERROR;
+            }
+            struct v4l2_subdev_selection select;
+            CLEAR(select);
+            select.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+            select.target = V4L2_SEL_TGT_CROP;
+            select.pad = 0;
+            select.flags = 0;
+            select.r.left = 0;
+            select.r.top = 0;
+            select.r.width = nodeWidth;
+            select.r.height = nodeHeight;
+            addSelectionVideoParams(MEDIACTL_INPUTNAME, select, mediaCtlConfig);
+            LOG2("pipe log name: %s  if size %dx%d", mLut[i].nodeName.c_str(), nodeWidth, nodeHeight);
+
+            // Get BDS info
+            ret = getNodeInfo(GCSS_KEY_IMGU_BDS, *pipe, &nodeWidth, &nodeHeight);
+            if (ret != OK) {
+                LOGE("pipe log name: %s can't get info!", mLut[i].nodeName.c_str());
+                return UNKNOWN_ERROR;
+            }
+            CLEAR(select);
+            select.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+            select.target = V4L2_SEL_TGT_COMPOSE;
+            select.pad = 0;
+            select.flags = 0;
+            select.r.left = 0;
+            select.r.top = 0;
+            select.r.width = nodeWidth;
+            select.r.height = nodeHeight;
+            addSelectionVideoParams(MEDIACTL_INPUTNAME, select, mediaCtlConfig);
+            LOG2("pipe log name: %s  bds size %dx%d", mLut[i].nodeName.c_str(), nodeWidth, nodeHeight);
         }
+
+        /* if node active add it to mediactl config */
+        if (width != 0) {
+            LOG2("Adding video node: %s", NODE_NAME(pipe));
+            addImguVideoNode(mLut[i].nodeType, mLut[i].nodeName, mediaCtlConfig);
+        }
+
+        MediaCtlConfig* pipeConfig = (mLut[i].pad == MEDIACTL_PAD_PV_NUM) ? mediaCtlConfigStill
+                                   : (mLut[i].pad == MEDIACTL_PAD_VF_NUM) ? mediaCtlConfigVideo
+                                   :                                        mediaCtlConfig;
+
+        addFormatParams(mLut[i].nodeName, width, height, 1,
+                        format, 0, pipeConfig);
+
+        if (mLut[i].uidStr != GC_INPUT) {
+            addLinkParams(kImguName, mLut[i].pad, mLut[i].nodeName, 0, 1, MEDIA_LNK_FL_ENABLED, pipeConfig);
+        }
+#ifdef VIDEO_PIPE_FOR_STILL_PREVIEW
+        // Add video pipe config also when still pipe is enabled.
+        // Video pipe will be used for still preview phase because still pipe has no stats output
+        // Related node is added to common MediaCtlData for device opening.
+        if (mLut[i].pad == MEDIACTL_PAD_PV_NUM) {
+            addFormatParams(MEDIACTL_PREVIEWNAME, width, height, 1,
+                            format, 0, mediaCtlConfigVideo);
+            addLinkParams(kImguName, MEDIACTL_PAD_VF_NUM, MEDIACTL_PREVIEWNAME, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfigVideo);
+
+            addImguVideoNode(IMGU_NODE_VF_PREVIEW, MEDIACTL_PREVIEWNAME, mediaCtlConfig);
+        }
+#endif
     }
 
-    LOG2("Adding stats node");
     addImguVideoNode(IMGU_NODE_STAT, MEDIACTL_STATNAME, mediaCtlConfig);
-    addLinkParams(kImguName, 3, MEDIACTL_STATNAME, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
+    addLinkParams(kImguName, 5, MEDIACTL_STATNAME, 0, 1, MEDIA_LNK_FL_ENABLED, mediaCtlConfig);
 
     LOG2("Adding parameter node");
     addImguVideoNode(IMGU_NODE_PARAM, MEDIACTL_PARAMETERNAME, mediaCtlConfig);
@@ -2396,7 +2373,55 @@ void GraphConfig::setMediaCtlConfig(std::shared_ptr<MediaController> mediaCtl,
                                     bool enableStill)
 {
     mMediaCtl = mediaCtl;
+
+    const int mainPad = !swapVideoPreview ? MEDIACTL_PAD_OUTPUT_NUM
+                      : enableStill       ? MEDIACTL_PAD_PV_NUM
+                      :                     MEDIACTL_PAD_VF_NUM;
+    const int secondPad = swapVideoPreview ? MEDIACTL_PAD_OUTPUT_NUM
+                        : enableStill      ? MEDIACTL_PAD_PV_NUM
+                        :                    MEDIACTL_PAD_VF_NUM;
+    mLut.clear();
+    MediaCtlLut lut;
+    lut.nodeType = IMGU_NODE_NULL;
+
+    lut.uid = GCSS_KEY_IMGU_STILL;
+    lut.uidStr = GCSS::ItemUID::key2str(lut.uid);
+    lut.pad = -1;
+    lut.nodeName = MEDIACTL_STILLNAME;
+    mLut.push_back(lut);
+
+    lut.uid = GCSS_KEY_INPUT;
+    lut.uidStr = GCSS::ItemUID::key2str(lut.uid);
+    lut.pad = 0;
+    lut.nodeName = MEDIACTL_INPUTNAME;
+    mLut.push_back(lut);
+
+    lut.uid = GCSS_KEY_IMGU_VIDEO;
+    lut.uidStr = GCSS::ItemUID::key2str(lut.uid);
+    lut.pad = mainPad;
+    lut.nodeName = (lut.pad == MEDIACTL_PAD_OUTPUT_NUM) ? MEDIACTL_VIDEONAME
+                 : (lut.pad == MEDIACTL_PAD_PV_NUM)     ? MEDIACTL_POSTVIEWNAME
+                                                        : MEDIACTL_PREVIEWNAME;
+    mLut.push_back(lut);
+
+    lut.uid = GCSS_KEY_IMGU_PREVIEW;
+    lut.uidStr = GCSS::ItemUID::key2str(lut.uid);
+    lut.pad = secondPad;
+    lut.nodeName = (lut.pad == MEDIACTL_PAD_OUTPUT_NUM) ? MEDIACTL_VIDEONAME
+                 : (lut.pad == MEDIACTL_PAD_PV_NUM)     ? MEDIACTL_POSTVIEWNAME
+                                                        : MEDIACTL_PREVIEWNAME;
+    mLut.push_back(lut);
+
+    int previewNodeName = enableStill ? IMGU_NODE_PV_PREVIEW : IMGU_NODE_VF_PREVIEW;
+    for (auto & it : mLut) {
+         it.nodeType = (it.uid == GCSS_KEY_IMGU_PREVIEW) ? previewNodeName
+                        : (it.uid == GCSS_KEY_IMGU_VIDEO)   ? IMGU_NODE_VIDEO
+                        : (it.uid == GCSS_KEY_IMGU_STILL)   ? IMGU_NODE_STILL
+                        : (it.uid == GCSS_KEY_INPUT)        ? IMGU_NODE_INPUT
+                                                            : IMGU_NODE_NULL;
+    }
 }
+
 
 /*
  * Imgu helper function
@@ -2546,13 +2571,6 @@ void GraphConfig::dumpMediaCtlConfig(const MediaCtlConfig &config) const {
             config.mFormatParams[i].width,
             config.mFormatParams[i].height,
             config.mFormatParams[i].formatCode);
-    }
-    for (i = 0; i < config.mSelectionVideoParams.size() ; i++) {
-       LOGE("Selection video Params entityName=%s  type=%d ,target=%d, flag=%d"
-            ,config.mSelectionVideoParams[i].entityName.c_str(),
-            config.mSelectionVideoParams[i].select.type,
-            config.mSelectionVideoParams[i].select.target,
-            config.mSelectionVideoParams[i].select.flags);
     }
     for (i = 0; i < config.mSelectionParams.size() ; i++) {
        LOGE("Selection Params entityName=%s  pad=%d ,target=%d, top=%d left=%d width=%d, height=%d"
@@ -2776,7 +2794,7 @@ void GraphConfig::addSelectionParams(const string &entityName,
 }
 
 void GraphConfig::addSelectionVideoParams(const string &entityName,
-                                     const struct v4l2_selection &select,
+                                     const struct v4l2_subdev_selection &select,
                                      MediaCtlConfig* config)
 {
     if (entityName.empty() || !config) {
@@ -2788,9 +2806,9 @@ void GraphConfig::addSelectionVideoParams(const string &entityName,
     mediaCtlSelectionVideoParams.entityName = entityName;
     mediaCtlSelectionVideoParams.select = select;
     config->mSelectionVideoParams.push_back(mediaCtlSelectionVideoParams);
-    LOG2("@%s, width:%d, height:%d, left:%d, top:%d, target:%d, type:%d, flags:%d entityName:%s",
+    LOG2("@%s, width:%d, height:%d, left:%d, top:%d, target:%d, which:%d, flags:%d entityName:%s",
         __FUNCTION__, select.r.width, select.r.height, select.r.left, select.r.top,
-        select.target, select.type, select.flags, entityName.c_str());
+        select.target, select.which, select.flags, entityName.c_str());
 }
 
 /**
