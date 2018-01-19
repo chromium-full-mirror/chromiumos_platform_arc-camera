@@ -30,6 +30,7 @@
 #include "CaptureBuffer.h"
 #include "CaptureUnitSettings.h"
 #include "RequestCtrlState.h"
+#include <linux/intel-ipu3.h>
 
 namespace android {
 namespace camera2 {
