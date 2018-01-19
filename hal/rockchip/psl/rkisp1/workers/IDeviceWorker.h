@@ -21,7 +21,6 @@
 #ifndef PSL_RKISP1_WORKERS_IDEVICEWORKER_H_
 #define PSL_RKISP1_WORKERS_IDEVICEWORKER_H_
 
-#include "common/PollerThread.h"
 #include "RequestCtrlState.h"
 #include "GraphConfig.h"
 #include "tasks/ExecuteTaskBase.h"

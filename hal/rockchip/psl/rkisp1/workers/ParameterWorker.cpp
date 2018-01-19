@@ -24,8 +24,6 @@
 
 #include "ParameterWorker.h"
 #include "PlatformData.h"
-#include "RKISP1CameraHw.h"
-#include "NodeTypes.h"
 
 #define RKISP1_ISP_PARAMS_REQ_BUFS_MIN    2
 #define RKISP1_ISP_PARAMS_REQ_BUFS_MAX    8

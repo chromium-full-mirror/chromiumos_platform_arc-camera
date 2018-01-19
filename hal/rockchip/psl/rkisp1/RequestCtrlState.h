@@ -83,6 +83,7 @@ struct RequestCtrlState {
     uint8_t framesArrived;
     bool shutterDone;
     bool blackLevelOff;
+    ICaptureEventListener::CaptureBuffers captureBufs;
 
     uint8_t androidAeState;  /**< Current AE state, based on the
                                   AE settings and AE results */

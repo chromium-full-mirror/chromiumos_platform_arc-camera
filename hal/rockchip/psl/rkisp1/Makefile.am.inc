@@ -21,13 +21,16 @@ PSLSRC = \
     psl/rkisp1/RKISP1Common.cpp \
     psl/rkisp1/RKISP1CameraHw.cpp \
     psl/rkisp1/HwStreamBase.cpp \
+    psl/rkisp1/InputSystem.cpp \
     psl/rkisp1/SyncManager.cpp \
     psl/rkisp1/SensorHwOp.cpp \
     psl/rkisp1/LensHw.cpp \
     psl/rkisp1/CameraBuffer.cpp \
+    psl/rkisp1/CaptureUnit.cpp \
     psl/rkisp1/ControlUnit.cpp \
     psl/rkisp1/ImguUnit.cpp \
     psl/rkisp1/SettingsProcessor.cpp \
+    psl/rkisp1/BufferPools.cpp \
     psl/rkisp1/Metadata.cpp \
     psl/rkisp1/tasks/ExecuteTaskBase.cpp \
     psl/rkisp1/tasks/ITaskEventSource.cpp \
@@ -36,6 +39,7 @@ PSLSRC = \
     psl/rkisp1/tasks/ITaskEventListener.cpp \
     psl/rkisp1/tasks/JpegEncodeTask.cpp \
     psl/rkisp1/workers/FrameWorker.cpp \
+    psl/rkisp1/workers/InputFrameWorker.cpp \
     psl/rkisp1/workers/OutputFrameWorker.cpp \
     psl/rkisp1/workers/StatisticsWorker.cpp \
     psl/rkisp1/workers/ParameterWorker.cpp \
@@ -52,7 +56,8 @@ PSLCPPFLAGS = \
     -I$(top_srcdir)/include/ia_imaging \
     -I$(top_srcdir)/include/rk_imaging \
     -DCAMERA_RKISP1_SUPPORT \
-    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F
+    -DHAL_PIXEL_FORMAT_NV12_LINEAR_CAMERA_RK=0x10F \
+    -DUSED_FAKE_INPUTSYS
 
 if REMOTE_3A_SERVER
 PSLCPPFLAGS += \

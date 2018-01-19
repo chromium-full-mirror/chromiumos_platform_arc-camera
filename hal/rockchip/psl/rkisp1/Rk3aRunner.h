@@ -30,9 +30,6 @@
 namespace android {
 namespace camera2 {
 
-class SettingsProcessor;
-class LensHw;
-
 class Rk3aRunner
 {
 public:

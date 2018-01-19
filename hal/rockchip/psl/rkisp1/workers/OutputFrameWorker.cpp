@@ -24,6 +24,7 @@
 #include "PerformanceTraces.h"
 #include "OutputFrameWorker.h"
 #include "ColorConverter.h"
+#include "CaptureBuffer.h"
 #include "NodeTypes.h"
 #include <libyuv.h>
 #include <sys/mman.h>
@@ -228,16 +229,18 @@ status_t OutputFrameWorker::run()
     V4L2BufferInfo outBuf;
 
     status = mNode->grabFrame(&outBuf);
-    if (mNodeName == IMGU_NODE_VIDEO) {
-        ICaptureEventListener::CaptureMessage outMsg;
-        Camera3Request* request = mMsg->cbMetadataMsg.request;
-        outMsg.data.event.reqId = request->getId();
-        outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
-        outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
-        outMsg.data.event.timestamp = outBuf.vbuffer.timestamp();
-        outMsg.data.event.sequence = outBuf.vbuffer.sequence();
-        notifyListeners(&outMsg);
-    }
+
+#ifdef USED_FAKE_INPUTSYS
+    ICaptureEventListener::CaptureMessage outMsg;
+    Camera3Request* request = mMsg->cbMetadataMsg.request;
+    outMsg.data.event.reqId = request->getId();
+    outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
+    outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_SHUTTER;
+    outMsg.data.event.timestamp = outBuf.vbuffer.timestamp();
+    outMsg.data.event.sequence = outBuf.vbuffer.sequence();
+    notifyListeners(&outMsg);
+#endif
+
     return (status < 0) ? status : OK;
 }
 

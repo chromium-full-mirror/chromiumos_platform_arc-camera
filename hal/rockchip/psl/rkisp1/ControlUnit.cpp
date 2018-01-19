@@ -24,6 +24,7 @@
 #include "PerformanceTraces.h"
 #include "ControlUnit.h"
 #include "RKISP1CameraHw.h"
+#include "CaptureUnit.h"
 #include "ImguUnit.h"
 #include "CameraStream.h"
 #include "RKISP1CameraCapInfo.h"
@@ -41,18 +42,18 @@ namespace android {
 namespace camera2 {
 
 ControlUnit::ControlUnit(ImguUnit *thePU,
+                         CaptureUnit *theCU,
                          int cameraId,
-                         IStreamConfigProvider &aStreamCfgProv,
-                         std::shared_ptr<MediaController> mc) :
+                         IStreamConfigProvider &aStreamCfgProv) :
         mRequestStatePool("CtrlReqState"),
         mCaptureUnitSettingsPool("CapUSettings"),
         mProcUnitSettingsPool("ProcUSettings"),
         mLatestStatistics(nullptr),
         mLatestRequestId(-1),
         mImguUnit(thePU),
+        mCaptureUnit(theCU),
         m3aWrapper(nullptr),
         mCameraId(cameraId),
-        mMediaCtl(mc),
         mThreadRunning(false),
         mMessageQueue("CtrlUnitThread", static_cast<int>(MESSAGE_ID_MAX)),
         mMessageThread(nullptr),
@@ -60,51 +61,9 @@ ControlUnit::ControlUnit(ImguUnit *thePU,
         mSettingsProcessor(nullptr),
         mMetadata(nullptr),
         m3ARunner(nullptr),
-        mSensorSettingsDelay(0),
-        mGainDelay(0),
-        mLensSupported(false),
         mLensController(nullptr),
         mSofSequence(0)
 {
-}
-
-/**
- * initStaticMetadata
- *
- * Create CameraMetadata object to retrieve the static tags used in this class
- * we cache them as members so that we do not need to query CameraMetadata class
- * everytime we need them. This is more efficient since find() is not cheap
- */
-status_t ControlUnit::initStaticMetadata()
-{
-    //Initialize the CameraMetadata object with the static metadata tags
-    camera_metadata_t* plainStaticMeta;
-    plainStaticMeta = (camera_metadata_t*)PlatformData::getStaticMetadata(mCameraId);
-    if (plainStaticMeta == nullptr) {
-        LOGE("Failed to get camera %d StaticMetadata", mCameraId);
-        return UNKNOWN_ERROR;
-    }
-
-    CameraMetadata staticMeta(plainStaticMeta);
-    camera_metadata_entry entry;
-    entry = staticMeta.find(ANDROID_LENS_INFO_MINIMUM_FOCUS_DISTANCE);
-    if (entry.count == 1) {
-        LOG1("camera %d minimum focus distance:%f", mCameraId, entry.data.f[0]);
-        mLensSupported = (entry.data.f[0] > 0) ? true : false;
-        LOG1("Lens movement %s for camera id %d",
-             mLensSupported ? "supported" : "NOT supported", mCameraId);
-    }
-    staticMeta.release();
-
-    const RKISP1CameraCapInfo *cap = getRKISP1CameraCapInfo(mCameraId);
-    if (cap == nullptr) {
-        LOGE("Failed to get cameraCapInfo");
-        return UNKNOWN_ERROR;
-    }
-    mSensorSettingsDelay = MAX(cap->mExposureLag, cap->mGainLag);
-    mGainDelay = cap->mGainLag;
-
-    return NO_ERROR;
 }
 
 status_t
@@ -113,38 +72,7 @@ ControlUnit::init()
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     status_t status = OK;
     const char *sensorName = nullptr;
-
-    //Cache the static metadata values we are going to need in the capture unit
-    if (initStaticMetadata() != NO_ERROR) {
-        LOGE("Cannot initialize static metadata");
-        return NO_INIT;
-    }
-
-    ISofListener *sofListener = NULL;
-    ISettingsSyncListener *syncListener = NULL;
-    mSyncManager = std::make_shared<SyncManager>(mCameraId, mMediaCtl, sofListener, syncListener);
-
-    status = mSyncManager->init(mSensorSettingsDelay, mGainDelay);
-    if (status != NO_ERROR) {
-        LOGE("Cannot initialize SyncManager (status= 0x%X)", status);
-        return status;
-    }
-
-    if (!mLensSupported) {
-        mLensController = nullptr;
-    } else {
-        mLensController = std::make_shared<LensHw>(mCameraId, mMediaCtl);
-        if (mLensController == nullptr) {
-            LOGE("@%s: Error creating LensHw", __FUNCTION__);
-            return NO_INIT;
-        }
-
-        status = mLensController->init();
-        if (status != NO_ERROR) {
-            LOGE("%s:Cannot initialize LensHw (status= 0x%X)", __FUNCTION__, status);
-            return status;
-        }
-    }
+    LensHw *lensController;
 
     mMessageThread = std::unique_ptr<MessageThread>(new MessageThread(this, "CtrlUThread"));
     mMessageThread->run();
@@ -163,6 +91,8 @@ ControlUnit::init()
         return UNKNOWN_ERROR;
     }
 
+    /* TODO */
+    /* m3aWrapper->enableAiqdDataSave(true); */
     if (m3aWrapper->initAIQ(sensorName) != NO_ERROR) {
         LOGE("Error initializing 3A control");
         return UNKNOWN_ERROR;
@@ -178,6 +108,8 @@ ControlUnit::init()
         return UNKNOWN_ERROR;
     }
 
+    mCaptureUnit->setSettingsProcessor(mSettingsProcessor);
+
     /*
      * init the pools of Request State structs and CaptureUnit settings
      * and Processing Unit Settings
@@ -186,9 +118,14 @@ ControlUnit::init()
     mCaptureUnitSettingsPool.init(SETTINGS_POOL_SIZE + 2);
     mProcUnitSettingsPool.init(SETTINGS_POOL_SIZE, ProcUnitSettings::reset);
 
+    /*
+     * Retrieve the Lens Controller interface from Capture Unit
+     */
+    lensController = mCaptureUnit->getLensControlInterface();
+
     mSettingsHistory.clear();
 
-    m3ARunner = new Rk3aRunner(mCameraId, m3aWrapper, mSettingsProcessor, mLensController.get());
+    m3ARunner = new Rk3aRunner(mCameraId, m3aWrapper, mSettingsProcessor, lensController);
 
     /* Set digi gain support */
     bool supportDigiGain = false;
@@ -217,6 +154,8 @@ void RequestCtrlState::reset(RequestCtrlState* me)
     if (CC_LIKELY(me != nullptr)) {
         me->captureSettings.reset();
         me->processingSettings.reset();
+        me->captureBufs.rawBuffer.reset();
+        me->captureBufs.rawNonScaledBuffer.reset();
         me->graphConfig.reset();
         DELETE_ARRAY_AND_NULLIFY(me->rGammaLut);
         DELETE_ARRAY_AND_NULLIFY(me->gGammaLut);
@@ -418,11 +357,6 @@ ControlUnit::~ControlUnit()
         m3aWrapper = nullptr;
     }
 
-    if(mSyncManager) {
-        mSyncManager->stop();
-        mSyncManager = nullptr;
-    }
-
     delete mMetadata;
     mMetadata = nullptr;
 
@@ -440,22 +374,6 @@ ControlUnit::configStreamsDone(bool configChanged)
         mPendingRequests.clear();
         mWaitingForCapture.clear();
         mSettingsHistory.clear();
-        /*stop here? zyc*/
-        mSyncManager->stop();
-
-        /* get sensor mode here ? zyc */
-        ICaptureEventListener::CaptureMessage outMsg;
-        outMsg.id = ICaptureEventListener::CAPTURE_MESSAGE_ID_EVENT;
-        outMsg.data.event.type = ICaptureEventListener::CAPTURE_EVENT_NEW_SENSOR_DESCRIPTOR;
-
-        status_t status = getSensorModeData(outMsg.data.event.exposureDesc);
-        if (CC_UNLIKELY(status != OK)) {
-            LOGE("Failed to retrieve sensor mode data - BUG");
-            return status;
-        }
-
-        //outMsg.data.event.frameParams = isysConfigResult.sensorFrameParams;
-        notifyCaptureEvent(&outMsg);
     }
 
     return NO_ERROR;
@@ -734,6 +652,12 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
     LastaiqResults = reqState->captureSettings->aiqResults;
     dump3A(reqState->captureSettings->aiqResults);
 
+    status = mCaptureUnit->doCapture(reqState->request,
+                                     reqState->captureSettings,
+                                     reqState->graphConfig);
+    if (CC_UNLIKELY(status != NO_ERROR)) {
+        LOGE("Failed to issue capture request for id %d", reqId);
+    }
     /**
      * Move the request to the vector mWaitingForCapture
      */
@@ -789,29 +713,48 @@ ControlUnit::processRequestForCapture(std::shared_ptr<RequestCtrlState> &reqStat
         reqState->captureSettings->makernote.size = 0;
     }
 
-    bool started = false;
-    mSyncManager->isStarted(started);
-    if (!started) {
-        LOG1("@%s: Starting SyncManager", __FUNCTION__);
-        mSyncManager->start();
-    }
-
-    /*TODO, needn't this anymore ? zyc*/
-    reqState->framesArrived++;
-    status = completeProcessing(reqState);
-    if (status != OK)
-        LOGE("Cannot complete the buffer processing - fix the bug!");
-
     return status;
 }
 
 status_t
-ControlUnit::applyAeParams(std::shared_ptr<CaptureUnitSettings> &aiqCaptureSettings)
+ControlUnit::handleNewImage(Message &msg)
 {
+    status_t status = OK;
+    std::shared_ptr<RequestCtrlState> reqState = nullptr;
+    int reqId = msg.requestId;
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-    status_t status = NO_ERROR;
 
-    status = mSyncManager->setParameters(aiqCaptureSettings);
+    std::map<int, std::shared_ptr<RequestCtrlState>>::iterator it =
+                                    mWaitingForCapture.find(reqId);
+    if (it == mWaitingForCapture.end()) {
+        LOGE("Unexpected new image received %d - Fix the bug", reqId);
+        return UNKNOWN_ERROR;
+    }
+
+    reqState = it->second;
+    if (reqState.get() == nullptr) {
+        LOGE("State for request Id = %d is not present - Fix the bug", reqId);
+        return UNKNOWN_ERROR;
+    }
+
+    /*
+     * Send the buffer. See complete processing to understand
+     * how we do the hold up.
+     */
+    reqState->captureBufs.rawBuffer = nullptr;
+    reqState->captureBufs.rawNonScaledBuffer = nullptr;
+
+    reqState->framesArrived++;
+    if (msg.type == CAPTURE_EVENT_RAW_BAYER) {
+        reqState->captureBufs.rawNonScaledBuffer = msg.rawBuffer;
+    } else {
+        LOGE("Unknown capture buffer type in request %d- Fix the bug", reqId);
+        return UNKNOWN_ERROR;
+    }
+
+    status = completeProcessing(reqState);
+    if (status != OK)
+        LOGE("Cannot complete the buffer processing - fix the bug!");
 
     return status;
 }
@@ -894,14 +837,23 @@ ControlUnit::completeProcessing(std::shared_ptr<RequestCtrlState> &reqState)
         reqState->ctrlUnitResult->update(ANDROID_SENSOR_ROLLING_SHUTTER_SKEW,
                                          &rollingShutterSkew, 1);
 
-        uint8_t pipelineDepth;
-        mSettingsProcessor->getStaticMetadataCache().getPipelineDepth(pipelineDepth);
+        uint8_t pipelineDepth = mCaptureUnit->getPipelineDepth();
         //# ANDROID_METADATA_Dynamic android.request.pipelineDepth done
         reqState->ctrlUnitResult->update(ANDROID_REQUEST_PIPELINE_DEPTH,
                                          &pipelineDepth, 1);
     }
 
     updateMeta = true;
+    #ifndef USED_FAKE_INPUTSYS
+    /*
+     * Remove the request from Q once we have received all pixel data buffers
+     * we expect from ISA. Query the graph config for that.
+     *
+     * Request which are processed from input buffers do not wait for pixel data
+     */
+    if (reqState->request->getNumberInputBufs() == 0)
+        mWaitingForCapture.erase(reqId);
+    #endif
 
     if (CC_LIKELY((reqState->request != nullptr) &&
                   (reqState->captureSettings.get() != nullptr))) {
@@ -919,6 +871,7 @@ ControlUnit::completeProcessing(std::shared_ptr<RequestCtrlState> &reqState)
         reqState->processingSettings->android3Actrl = reqState->aaaControls;
 
         mImguUnit->completeRequest(reqState->processingSettings,
+                                         reqState->captureBufs,
                                          updateMeta);
     } else {
         LOGE("request or captureSetting is nullptr - Fix the bug!");
@@ -949,14 +902,16 @@ ControlUnit::handleNewShutter(Message &msg)
         return UNKNOWN_ERROR;
     }
 
-    /*
-     * Remove the request from Q once we have received all pixel data buffers
-     * we expect from ISA. Query the graph config for that.
-     *
-     * Request which are processed from input buffers do not wait for pixel data
-     */
-    if (reqState->request->getNumberInputBufs() == 0)
-        mWaitingForCapture.erase(reqId);
+#ifdef USED_FAKE_INPUTSYS
+        /*
+         * Remove the request from Q once we have received all pixel data buffers
+         * we expect from ISA. Query the graph config for that.
+         *
+         * Request which are processed from input buffers do not wait for pixel data
+         */
+        if (reqState->request->getNumberInputBufs() == 0)
+            mWaitingForCapture.erase(reqId);
+#endif
 
     /* flash state - hack, should know from frame whether it fired */
     const CameraMetadata* metaData = reqState->request->getSettings();
@@ -997,6 +952,7 @@ ControlUnit::flush(void)
     Message msg;
     msg.id = MESSAGE_ID_FLUSH;
     mMessageQueue.remove(MESSAGE_ID_NEW_REQUEST);
+    mMessageQueue.remove(MESSAGE_ID_NEW_IMAGE);
     mMessageQueue.remove(MESSAGE_ID_NEW_2A_STAT);
     mMessageQueue.remove(MESSAGE_ID_NEW_SENSOR_DESCRIPTOR);
     mMessageQueue.remove(MESSAGE_ID_NEW_SHUTTER);
@@ -1008,35 +964,11 @@ ControlUnit::handleMessageFlush(void)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
 
-    mSyncManager->flush();
     mWaitingForCapture.clear();
     mPendingRequests.clear();
     mSettingsHistory.clear();
 
     return NO_ERROR;
-}
-
-/**
- * getSensorModeData
- *
- * Retrieves the exposure sensor descriptor that the 3A algorithms need to run
- * This information is relayed to control unit.
- * The other piece of information related to sensor mode (frame params) is
- * provided by the Input System as part of the configuration results.
- *
- * \param [out] desc: Sensor descriptor to fill in
- * \return OK if everything went fine.
- * \return BAD_VALUE if any of the sensor driver queries failed.
- */
-status_t
-ControlUnit::getSensorModeData(rk_aiq_exposure_sensor_descriptor &desc)
-{
-    HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    status_t status = NO_ERROR;
-
-    status = mSyncManager->getSensorModeData(desc);
-
-    return status;
 }
 
 void
@@ -1059,6 +991,9 @@ ControlUnit::messageThreadLoop()
             break;
         case MESSAGE_ID_NEW_REQUEST:
             status = handleNewRequest(msg);
+            break;
+        case MESSAGE_ID_NEW_IMAGE:
+            status = handleNewImage(msg);
             break;
         case MESSAGE_ID_NEW_2A_STAT:
             if (handleNewStat(msg) != NO_ERROR)
@@ -1105,6 +1040,14 @@ ControlUnit::notifyCaptureEvent(CaptureMessage *captureMsg)
 
     Message msg;
     switch (captureMsg->data.event.type) {
+        case CAPTURE_EVENT_RAW_BAYER:
+            msg.id = MESSAGE_ID_NEW_IMAGE;
+            msg.type = CAPTURE_EVENT_RAW_BAYER;
+            /* msg.requestId = captureMsg->data.event.pixelBuffer->buf->requestId(); */
+            msg.requestId = captureMsg->data.event.reqId;
+            msg.rawBuffer = captureMsg->data.event.pixelBuffer;
+            mMessageQueue.send(&msg);
+            break;
         case CAPTURE_EVENT_NEW_SENSOR_DESCRIPTOR:
             msg.id = MESSAGE_ID_NEW_SENSOR_DESCRIPTOR;
             msg.data.sensor.exposureDesc = captureMsg->data.event.exposureDesc;
@@ -1126,7 +1069,11 @@ ControlUnit::notifyCaptureEvent(CaptureMessage *captureMsg)
             msg.data.shutter.requestId = captureMsg->data.event.reqId;
             msg.data.shutter.tv_sec = captureMsg->data.event.timestamp.tv_sec;
             msg.data.shutter.tv_usec = captureMsg->data.event.timestamp.tv_usec;
+            #ifdef USED_FAKE_INPUTSYS
             mMessageQueue.send(&msg, MESSAGE_ID_NEW_SHUTTER);
+            #else
+            mMessageQueue.send(&msg);
+            #endif
             break;
         case CAPTURE_EVENT_NEW_SOF:
             mSofSequence = captureMsg->data.event.sequence;

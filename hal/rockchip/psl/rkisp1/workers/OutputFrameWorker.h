@@ -24,7 +24,7 @@
 #include "FrameWorker.h"
 #include "tasks/ICaptureEventSource.h"
 #include "tasks/JpegEncodeTask.h"
-#include "NodeTypes.h"
+
 namespace android {
 namespace camera2 {
 

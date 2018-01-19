@@ -31,6 +31,7 @@ namespace camera2 {
 
 class ControlUnit;
 class ImguUnit;
+class CaptureUnit;
 
 /**
  * \enum
@@ -87,6 +88,7 @@ class RKISP1CameraHw: public ICameraHw {
     int mPipelineDepth;  /*!< How many request we allow in the PSL at one time*/
     ImguUnit *mImguUnit;
     ControlUnit *mControlUnit;
+    CaptureUnit *mCaptureUnit;
     // Vector to store dummy Hw streams
     std::vector<HwStreamBase *> mDummyHwStreamsVector;
     GraphConfigManager mGCM;
