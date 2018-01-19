@@ -65,7 +65,7 @@ private:
     status_t handleMessageFlush(void);
     status_t updateProcUnitResults(Camera3Request &request,
                                    std::shared_ptr<ProcUnitSettings> settings);
-    status_t startProcessing(DeviceMessage msg);
+    status_t startProcessing();
     void updateMiscMetadata(CameraMetadata &result,
                             std::shared_ptr<const ProcUnitSettings> settings) const;
     void updateDVSMetadata(CameraMetadata &result,
@@ -128,8 +128,6 @@ private:
 
     std::map<NodeTypes, camera3_stream_t *> mStreamNodeMapping; /* mStreamNodeMapping doesn't own camera3_stream_t objects */
     std::map<camera3_stream_t*, NodeTypes> mStreamListenerMapping;
-
-    std::vector<std::shared_ptr<V4L2DeviceBase>> mActivedNodes; 
 
     static const int PUBLIC_STATS_POOL_SIZE = 9;
     static const int RKISP1_MAX_STATISTICS_WIDTH = 80;

@@ -1983,13 +1983,12 @@ status_t GraphConfig::getMediaCtlData(MediaCtlConfig *mediaCtlConfig)
         return UNKNOWN_ERROR;
     }
 
-#if 0//needn't get the default expsure here, get it from 3a lib instead
     // Add control params
     retErr = addControls(sourceNode, sourceInfo, mediaCtlConfig);
     if (retErr != OK) {
         return UNKNOWN_ERROR;
     }
-#endif
+
     /*
      * Add Camera properties to mediaCtlConfig
      */

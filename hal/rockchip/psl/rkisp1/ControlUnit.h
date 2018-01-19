@@ -176,7 +176,7 @@ private:  /* Members */
     SharedItemPool<ProcUnitSettings> mProcUnitSettingsPool;
 
     std::map<int, std::shared_ptr<RequestCtrlState>> mWaitingForCapture;
-    std::vector<std::shared_ptr<rk_aiq_statistics_input_params>> mLatestStatisticsQue;
+    std::vector<std::shared_ptr<RequestCtrlState>> mPendingRequests;
     std::shared_ptr<rk_aiq_statistics_input_params>  mLatestStatistics;
     int64_t mLatestRequestId;
 
@@ -216,7 +216,6 @@ private:  /* Members */
     rk_aiq_exposure_sensor_descriptor mSensorDescriptor;
 
     uint32_t mSofSequence;
-    int64_t mShutterDoneReqId;
     static const int16_t AWB_CONVERGENCE_WAIT_COUNT = 2;
 };  // class ControlUnit
 

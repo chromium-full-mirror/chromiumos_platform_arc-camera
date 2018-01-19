@@ -62,9 +62,11 @@ status_t Rk3aCore::setStatistics(rk_aiq_statistics_input_params *ispStatistics,
 {
     LOG2("@%s", __FUNCTION__);
     status_t status = NO_ERROR;
-    status = mAiq.statisticsSet(ispStatistics, sensor_desc);
-    if (CC_UNLIKELY(status != NO_ERROR)) {
-        LOGE("Error setting statistics before 3A");
+    if (ispStatistics != nullptr) {
+        status = mAiq.statisticsSet(ispStatistics, sensor_desc);
+        if (CC_UNLIKELY(status != NO_ERROR)) {
+            LOGE("Error setting statistics before 3A");
+        }
     }
     return status;
 }

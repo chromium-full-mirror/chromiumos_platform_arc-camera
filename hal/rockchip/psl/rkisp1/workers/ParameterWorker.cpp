@@ -40,6 +40,7 @@
 namespace android {
 namespace camera2 {
 
+const unsigned int PARA_WORK_BUFFERS = 3;
 static int dpcc_param_check(struct cifisp_dpcc_config *arg)
 {
     unsigned int i = 0;
@@ -478,8 +479,8 @@ __check_params(struct rkisp1_isp_params_cfg *configs)
 
 ParameterWorker::ParameterWorker(std::shared_ptr<V4L2VideoNode> node,
                                  const StreamConfig& activeStreams,
-                                 int cameraId, size_t pipelineDepth) :
-        FrameWorker(node, cameraId, pipelineDepth, "ParameterWorker")
+                                 int cameraId) :
+        FrameWorker(node, cameraId, PARA_WORK_BUFFERS, "ParameterWorker")
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
 }
@@ -521,10 +522,10 @@ status_t ParameterWorker::configure(std::shared_ptr<GraphConfig> &config)
 status_t ParameterWorker::prepareRun(std::shared_ptr<DeviceMessage> msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    mMsgQue.push_back(msg);
+    mMsg = msg;
 
     // Don't queue ISP parameter buffer if test pattern mode is used.
-    if (msg->pMsg.processingSettings->captureSettings->testPatternMode
+    if (mMsg->pMsg.processingSettings->captureSettings->testPatternMode
             != ANDROID_SENSOR_TEST_PATTERN_MODE_OFF) {
         return OK;
     }
@@ -554,12 +555,6 @@ status_t ParameterWorker::run()
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
     LOG1("%s:%d: enter", __func__, __LINE__);
-    std::shared_ptr<DeviceMessage> mMsg;
-    if (mMsgQue.empty()) {
-        LOG2("%s:%d: No buffer queued before grabFrame, is a bug , fix me", __func__, __LINE__);
-        return UNKNOWN_ERROR;
-    }
-    mMsg = *(mMsgQue.begin());
 
     // Don't dequeue ISP parameter buffer if test pattern mode is used.
     if (mMsg->pMsg.processingSettings->captureSettings->testPatternMode
@@ -581,10 +576,7 @@ status_t ParameterWorker::run()
 status_t ParameterWorker::postRun()
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL1);
-    if (mMsgQue.empty())
-        return UNKNOWN_ERROR;
-    mMsgQue.erase(mMsgQue.begin());
-
+    mMsg = nullptr;
     return OK;
 }
 
@@ -1225,8 +1217,7 @@ status_t paramConvertor::convertParams(struct rkisp1_isp_params_cfg* isp_cfg, st
 
     if (memcmp(&aiqResults->aeResults.aec_config_result, &mLastAiqResults.aeResults.aec_config_result, sizeof(rk_aiq_aec_config)) != 0)
         convertAec(&isp_cfg->meas.aec_config, &aiqResults->aeResults.aec_config_result);
-    if (memcmp(&aiqResults->aeResults.hist_config_result, &mLastAiqResults.aeResults.hist_config_result, sizeof(rk_aiq_hist_config)) != 0)
-        convertHst(&isp_cfg->meas.hst_config, &aiqResults->aeResults.hist_config_result);
+
     if (memcmp(&aiqResults->afResults.afc_config, &mLastAiqResults.afResults.afc_config, sizeof(rk_aiq_afc_cfg)) != 0)
         convertAfc(&isp_cfg->meas.afc_config, &aiqResults->afResults.afc_config);
 
@@ -1247,8 +1238,6 @@ status_t paramConvertor::convertParams(struct rkisp1_isp_params_cfg* isp_cfg, st
         convertGoc(&isp_cfg->others.goc_config, &aiqResults->miscIspResults.gbce_config.goc_config);
     if (memcmp(&aiqResults->miscIspResults.gbce_config.ie_config, &mLastAiqResults.miscIspResults.gbce_config.ie_config, sizeof(rk_aiq_ie_config)) != 0)
         convertIe(&isp_cfg->others.ie_config, &aiqResults->miscIspResults.gbce_config.ie_config);
-    if (memcmp(&aiqResults->miscIspResults.bdm_config, &mLastAiqResults.miscIspResults.bdm_config, sizeof(rk_aiq_bdm_config)) != 0)
-        convertBdm(&isp_cfg->others.bdm_config, &aiqResults->miscIspResults.bdm_config);
 
     MEMCPY_S((void*)&mLastAiqResults,
              sizeof(struct AiqResults),

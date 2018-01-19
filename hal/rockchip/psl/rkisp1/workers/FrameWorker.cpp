@@ -36,7 +36,6 @@ FrameWorker::FrameWorker(std::shared_ptr<V4L2VideoNode> node,
         mPipelineDepth(pipelineDepth)
 {
     LOG1("%s handling node %s", name.c_str(), mNode->name());
-	mMsgQue.clear();
 }
 
 FrameWorker::~FrameWorker()

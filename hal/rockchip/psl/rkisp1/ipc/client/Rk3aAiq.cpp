@@ -200,8 +200,8 @@ status_t Rk3aAiq::statisticsSet(const rk_aiq_statistics_input_params* input_para
     LOG1("@%s, input_params:%p", __FUNCTION__, input_params);
     CheckError(mInitialized == false, UNKNOWN_ERROR, "@%s, mInitialized is false", __FUNCTION__);
     CheckError(reinterpret_cast<rk_aiq*>(mAiq) == nullptr, UNKNOWN_ERROR, "@%s, mAiq is nullptr", __FUNCTION__);
-    /*TODO: we allow null now.*/
-    //CheckError((input_params == nullptr), BAD_VALUE, "@%s, input_params is nullptr", __FUNCTION__);
+
+    CheckError((input_params == nullptr), BAD_VALUE, "@%s, input_params is nullptr", __FUNCTION__);
 
     set_statistics_params* params = static_cast<set_statistics_params*>(mMemStat.mAddr);
     set_statistics_params_data stat_input_params;

@@ -21,14 +21,12 @@
 #define LOG_TAG "ImguUnit"
 
 #include <vector>
-#include <algorithm>
 #include "ImguUnit.h"
 #include "LogHelper.h"
 #include "PerformanceTraces.h"
 #include "workers/OutputFrameWorker.h"
 #include "workers/StatisticsWorker.h"
 #include "CameraMetadataHelper.h"
-
 
 namespace android {
 namespace camera2 {
@@ -335,13 +333,13 @@ ImguUnit::createProcessingTasks(std::shared_ptr<GraphConfig> graphConfig)
         std::shared_ptr<FrameWorker> worker = nullptr;
         if (it.first == IMGU_NODE_STAT) {
             std::shared_ptr<StatisticsWorker> statWorker =
-                std::make_shared<StatisticsWorker>(it.second, mCameraId, pipelineDepth);
+                std::make_shared<StatisticsWorker>(it.second, mCameraId);
             mListenerDeviceWorkers.push_back(statWorker.get());
             videoConfig->deviceWorkers.push_back(statWorker);
             videoConfig->pollableWorkers.push_back(statWorker);
             videoConfig->nodes.push_back(statWorker->getNode());
         } else if (it.first == IMGU_NODE_PARAM) {
-            worker = std::make_shared<ParameterWorker>(it.second, mActiveStreams, mCameraId, pipelineDepth);
+            worker = std::make_shared<ParameterWorker>(it.second, mActiveStreams, mCameraId);
             mFirstWorkers.push_back(worker);
             videoConfig->deviceWorkers.push_back(worker); // parameters
         } else if (it.first == IMGU_NODE_STILL || it.first == IMGU_NODE_VIDEO) {
@@ -518,26 +516,28 @@ status_t ImguUnit::processNextRequest()
 {
     status_t status = NO_ERROR;
     std::shared_ptr<DeviceMessage> msg = nullptr;
-    Camera3Request *request = nullptr;
 
-
-    LOG2("%s: pending size %zu,underwork.size(%d), state %d", __FUNCTION__, mMessagesPending.size(), mMessagesUnderwork.size(), mState);
+    LOG2("%s: pending size %zu, state %d", __FUNCTION__, mMessagesPending.size(), mState);
     if (mMessagesPending.empty())
         return NO_ERROR;
+
+    if (mState == IMGU_RUNNING) {
+        LOGD("IMGU busy - message put into a waiting queue");
+        return NO_ERROR;
+    }
 
     msg = mMessagesPending[0];
     mMessagesPending.erase(mMessagesPending.begin());
 
     // update and return metadata firstly
-    request = msg->cbMetadataMsg.request;
+    Camera3Request *request = msg->cbMetadataMsg.request;
     if (request == nullptr) {
         LOGE("Request is nullptr");
         return BAD_VALUE;
     }
     LOG2("@%s:handleExecuteReq for Req id %d, ", __FUNCTION__, request->getId());
 
-    //rk needn't switch pipe, zyc
-    //checkAndSwitchPipe(request);
+    checkAndSwitchPipe(request);
 
     // Pass settings to the listening tasks *before* sending metadata
     // up to framework. Some tasks might need e.g. the result data.
@@ -583,6 +583,11 @@ status_t ImguUnit::processNextRequest()
     status = mPollerThread->pollRequest(request->getId(),
                                         500000,
                                         &(mCurPipeConfig->nodes));
+
+    if (status != OK)
+        return status;
+
+    mState = IMGU_RUNNING;
 
     return status;
 }
@@ -706,42 +711,29 @@ ImguUnit::updateProcUnitResults(Camera3Request &request,
  * tasks that wrap them to decide which tasks need to be executed.
  */
 status_t
-ImguUnit::startProcessing(DeviceMessage pollmsg)
+ImguUnit::startProcessing()
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
 
     status_t status = OK;
-    int numDevices = pollmsg.pollEvent.numDevices;
-    std::shared_ptr<V4L2VideoNode> *activeNodes = pollmsg.pollEvent.activeDevices; 
-
     std::vector<std::shared_ptr<IDeviceWorker>>::iterator it = mCurPipeConfig->deviceWorkers.begin();
     for (;it != mCurPipeConfig->deviceWorkers.end(); ++it) {
-        if (std::find(activeNodes, activeNodes + numDevices, (*it)->getNode()) != (activeNodes + numDevices)) {
-            status |= (*it)->run();
-        }
+        status |= (*it)->run();
     }
-    if (pollmsg.pollEvent.isAllPolled)
-        status |= (*mFirstWorkers.begin())->run();
 
     it = mCurPipeConfig->deviceWorkers.begin();
     for (;it != mCurPipeConfig->deviceWorkers.end(); ++it) {
-        if (std::find(activeNodes, activeNodes + numDevices, (*it)->getNode()) != (activeNodes + numDevices))
-            status |= (*it)->postRun();
-    }
-    if (pollmsg.pollEvent.isAllPolled)
-        status |= (*mFirstWorkers.begin())->postRun();
-
-    if (pollmsg.pollEvent.isAllPolled) {
-        //HACK: return metadata after updated it
-        std::shared_ptr<DeviceMessage> msg = *(mMessagesUnderwork.begin());
-        Camera3Request *request = msg->cbMetadataMsg.request;
-        request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
-
-        mMessagesUnderwork.erase(mMessagesUnderwork.begin());
-        LOG2("%s: request %d done", __func__, request->getId());
-
+        status |= (*it)->postRun();
     }
 
+    //HACK: return metadata after updated it
+    std::shared_ptr<DeviceMessage> msg = *(mMessagesUnderwork.begin());
+    Camera3Request *request = msg->cbMetadataMsg.request;
+    request->mCallback->metadataDone(request, CONTROL_UNIT_PARTIAL_RESULT);
+
+    mMessagesUnderwork.erase(mMessagesUnderwork.begin());
+
+    mState = IMGU_IDLE;
 
     return status;
 }
@@ -775,28 +767,24 @@ status_t ImguUnit::notifyPollEvent(PollEventMessage *pollMsg)
         msg.pollEvent.activeDevices = new std::shared_ptr<V4L2VideoNode>[numDevices];
         for (int i = 0; i < numDevices; i++) {
             msg.pollEvent.activeDevices[i] = (std::shared_ptr<V4L2VideoNode>&) pollMsg->data.activeDevices->at(i);
-            if (std::find(mActivedNodes.begin(), mActivedNodes.end(), pollMsg->data.activeDevices->at(i)) != mActivedNodes.end())
-                LOG2("%s: the actived node has been polled again, the driver may lost frame in request %d", __func__, msg.pollEvent.requestId);
-            else
-                mActivedNodes.push_back(pollMsg->data.activeDevices->at(i));
         }
         msg.pollEvent.numDevices = numDevices;
         msg.pollEvent.polledDevices = numPolledDevices;
 
-        if (mActivedNodes.size() != pollMsg->data.polledDevices->size()) {
+        if (pollMsg->data.activeDevices->size() != pollMsg->data.polledDevices->size()) {
             LOG2("@%s: %zu inactive nodes for request %u, retry poll", __FUNCTION__,
                                                                       pollMsg->data.inactiveDevices->size(),
                                                                       pollMsg->data.reqId);
-            msg.pollEvent.isAllPolled = false;
-            mMessageQueue.send(&msg, MESSAGE_ID_POLL);
+            pollMsg->data.polledDevices->clear();
+            *pollMsg->data.polledDevices = *pollMsg->data.inactiveDevices; // retry with inactive devices
+
+            delete [] msg.pollEvent.activeDevices;
 
             return -EAGAIN;
-        } else {
-            LOG2("%s:%d: all node have been polled, reqId(%d)", __func__, __LINE__, pollMsg->data.reqId);
-            msg.pollEvent.isAllPolled = true;
-            mActivedNodes.clear();
-            mMessageQueue.send(&msg, MESSAGE_ID_POLL);
         }
+
+        mMessageQueue.send(&msg);
+
     } else if (pollMsg->id == POLL_EVENT_ID_ERROR) {
         LOGE("Device poll failed");
         // For now, set number of device to zero in error case
@@ -869,11 +857,12 @@ ImguUnit::updateDVSMetadata(CameraMetadata &procUnitResults,
 status_t ImguUnit::handleMessagePoll(DeviceMessage msg)
 {
     HAL_TRACE_CALL(CAMERA_DEBUG_LOG_LEVEL2);
-
-    status_t status = startProcessing(msg);
-
     delete [] msg.pollEvent.activeDevices;
     msg.pollEvent.activeDevices = nullptr;
+
+    status_t status = startProcessing();
+    if (status == NO_ERROR)
+        status = processNextRequest();
 
     return status;
 }
