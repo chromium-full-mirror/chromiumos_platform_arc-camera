@@ -629,7 +629,7 @@ void EXIFMaker::clear()
     // the TIFF default is 1 (centered)
     exifAttributes.ycbcr_positioning = EXIF_DEF_YCBCR_POSITIONING;
 
-    // Clear the Rockchip 3A Makernote information
+    // Clear the Intel 3A Makernote information
     exifAttributes.makerNoteData = nullptr;
     exifAttributes.makerNoteDataSize = 0;
 

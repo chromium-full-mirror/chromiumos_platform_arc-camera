@@ -72,7 +72,7 @@
 /**
  * \macro INIT_COORDINATE
  * Initializes the value of a structure of type ia_coordinate
- *  (see rk_aiq_types.h)
+ *  (see ia_aiq_types.h)
  */
 #define INIT_COORDINATE(p,xVal,yVal) (p).x = xVal; (p).y = yVal;
 

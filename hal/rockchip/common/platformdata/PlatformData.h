@@ -101,7 +101,7 @@
 
 NAMESPACE_DECLARATION {
 typedef enum {
-    SUPPORTED_HW_RKISP1,
+    SUPPORTED_HW_IPU3,
     SUPPORTED_HW_UNKNOWN
 } CameraHwType;
 
@@ -158,10 +158,10 @@ enum ExtensionGroups {
   * 2. LSC self-calibration
   * 3. Latest detected flicker detection mode and flicker frequency
   *
-  * When the camera is starting, if there is aiqd data, rk_aiq_init() will
+  * When the camera is starting, if there is aiqd data, ia_aiq_init() will
   * use it. The 3a also could work if there is no aiqd data.
-  * When the camera is stopping, before the rk_aiq_deinit() is called,
-  * the rk_aiq_get_aiqd_data() will get the aiqd data from 3a libs.
+  * When the camera is stopping, before the ia_aiq_deinit() is called,
+  * the ia_aiq_get_aiqd_data() will get the aiqd data from 3a libs.
   *
   * The aiqd data will be read from file system to PlatformData
   * when the camera HAL is loaded by arc_camera3_service.

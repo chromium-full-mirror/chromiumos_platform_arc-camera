@@ -18,7 +18,7 @@
 #define _IA_CP_H_
 
 /** @file ia_cp.h
- * This file declares the Rockchip camera computational photography API.
+ * This file declares the Intel camera computational photography API.
  */
 
 #include "ia_types.h"

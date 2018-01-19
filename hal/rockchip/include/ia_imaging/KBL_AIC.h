@@ -19,7 +19,7 @@
 #include "ia_cmc_types.h"
 #include "cpffData.h"
 #include "Pipe.h"
-#include "RKISP1AICCommon.h"
+#include "IPU3AICCommon.h"
 #include "SkyCamAICVersion.h"
 
 class SkyCamAICImpl;
@@ -30,10 +30,10 @@ public:
 	LIBEXPORT KBL_AIC(ISPPipe **pipe, int numPipes,
 		const ia_cmc_t* cmc_parsed,
 		/*std::string cpf_file*/ const ia_binary_data* aiqb_,
-		RKISP1AICRuntimeParams runtime_params,
+		IPU3AICRuntimeParams runtime_params,
 		unsigned int dump_aic_parameters = 0, int test_framework_dump = 0);
-	LIBEXPORT void Run(RKISP1AICRuntimeParams *runtime_params, int length);
-	LIBEXPORT void Reset(RKISP1AICRuntimeParams runtime_params);
+	LIBEXPORT void Run(IPU3AICRuntimeParams *runtime_params, int length);
+	LIBEXPORT void Reset(IPU3AICRuntimeParams runtime_params);
 	static LIBEXPORT std::string GetAICVersion() { return SKYCAMAICVERSION; };
 	LIBEXPORT ~KBL_AIC(void);
 

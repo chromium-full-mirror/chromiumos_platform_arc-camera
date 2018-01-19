@@ -1303,8 +1303,8 @@ CameraHwType CameraProfiles::getCameraHwforId(int cameraId)
     CameraInfo *info = it->second;
     std::string hwType = info->hwType;
 
-    if (hwType == "SUPPORTED_HW_RKISP1") {
-        return SUPPORTED_HW_RKISP1;
+    if (hwType == "SUPPORTED_HW_IPU3") {
+        return SUPPORTED_HW_IPU3;
     } else
         LOGE("ERROR: Camera HW type wrong in xml");
         return SUPPORTED_HW_UNKNOWN;

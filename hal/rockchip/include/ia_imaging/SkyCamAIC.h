@@ -39,7 +39,7 @@ public:
 private:
     SkyCamAICImpl* pimpl_;
 
-	void ConvertRuntimeSkyCamToRKISP1(const SkyCamAICRuntimeParams &sklParams, RKISP1AICRuntimeParams &rkisp1Params);
+	void ConvertRuntimeSkyCamToIPU3(const SkyCamAICRuntimeParams &sklParams, IPU3AICRuntimeParams &ipu3Params);
 };
 
 

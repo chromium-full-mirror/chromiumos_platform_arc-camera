@@ -20,7 +20,7 @@ NAMESPACE_DECLARATION {
 /**
  * This enumeration lists the V4L2 nodes exposed by the InputSystem
  */
-enum IsysNodeTypes {
+enum IsysNodeNames {
     ISYS_NODE_NULL =                0,
     ISYS_NODE_CSI_RX0 =             1 << 0,
     ISYS_NODE_CSI_RX1 =             1 << 1,

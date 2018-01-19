@@ -24,7 +24,7 @@
 #define IA_EXC_H_
 
 #include "ia_types.h"
-#include "rk_aiq_types.h"
+#include "ia_aiq_types.h"
 #include "ia_cmc_types.h"
 
 #ifdef __cplusplus
@@ -45,7 +45,7 @@ extern "C" {
 LIBEXPORT ia_err
 ia_exc_exposure_time_to_sensor_units(
     const cmc_exposure_range_t *exposure_range,
-    const rk_aiq_exposure_sensor_descriptor *sensor_descriptor,
+    const ia_aiq_exposure_sensor_descriptor *sensor_descriptor,
     const int exposure_time_us,
     unsigned short *coarse_integration_time,
     unsigned short *fine_integration_time);
@@ -90,7 +90,7 @@ ia_exc_digital_gain_to_sensor_units(
  */
 LIBEXPORT ia_err
 ia_exc_sensor_units_to_exposure_time(
-    const rk_aiq_exposure_sensor_descriptor *sensor_descriptor,
+    const ia_aiq_exposure_sensor_descriptor *sensor_descriptor,
     const unsigned short coarse_integration_time,
     const unsigned short fine_integration_time,
     int *exposure_time);

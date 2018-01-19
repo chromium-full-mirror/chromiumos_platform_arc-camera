@@ -32,7 +32,7 @@
  */
 /*!
  * \file ia_ltm.h
- * \brief Definitions and declarations of Rockchip LTM library.
+ * \brief Definitions and declarations of Intel LTM library.
  */
 
 
@@ -41,7 +41,7 @@
 
 #include "ia_ltm_types.h"
 #include "ia_types.h"
-#include "rk_aiq_types.h"
+#include "ia_aiq_types.h"
 #include "ia_mkn_types.h"
 
 #ifdef __cplusplus
@@ -86,14 +86,14 @@ ia_ltm_deinit(ia_ltm *ia_ltm);
 typedef struct ia_ltm_input_params
 {
    ia_ltm_level ltm_level;                 /*!< Mandatory. LTM level. -1 to use tuning defaults.*/
-   rk_aiq_frame_use frame_use;             /*!< Mandatory. Target frame type of the LTM calculations (Preview, Still, video etc.). */
+   ia_aiq_frame_use frame_use;             /*!< Mandatory. Target frame type of the LTM calculations (Preview, Still, video etc.). */
    float ev_shift;                         /*!< Optional. Exposure Value shift [-4,4]. */
    char ltm_strength_manual;               /*!< Optional. user defined manual control for ltm strength, will be casted into unsigned char, [0, 200], default is 100 and means no manual effect*/
-   rk_aiq_ae_results *ae_results;          /*!< Optional. AEC output will be used by LTM.*/
+   ia_aiq_ae_results *ae_results;          /*!< Optional. AEC output will be used by LTM.*/
    int16_t frame_width;                    /*!< Mandatory. Width of the frame where the results will be applied. */
    int16_t frame_height;                   /*!< Mandatory. Height of the frame where the results will be applied. */
-   rk_aiq_rgbs_grid *rgbs_grid_ptr;        /*!< Optional. RGBS statistics. LTM may use this small grid instead of given larger grids to reduce PnP (available in IPU4 and onwards). */
-   rk_aiq_hdr_rgbs_grid *hdr_rgbs_grid_ptr;/*!< Optional. HDR RGBS statistics. LTM may use this small grid instead of given larger grids to reduce PnP (available in IPU4 and onwards). */
+   ia_aiq_rgbs_grid *rgbs_grid_ptr;        /*!< Optional. RGBS statistics. LTM may use this small grid instead of given larger grids to reduce PnP (available in IPU4 and onwards). */
+   ia_aiq_hdr_rgbs_grid *hdr_rgbs_grid_ptr;/*!< Optional. HDR RGBS statistics. LTM may use this small grid instead of given larger grids to reduce PnP (available in IPU4 and onwards). */
    ia_ltm_input_image *input_image_ptr;    /*!< Optional. Image data of any resolution based on IQ requirements for particular use case from which LTM calculates local tone maps (HW generated image available in IPU5 and onwards). */
 } ia_ltm_input_params;
 

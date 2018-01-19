@@ -22,7 +22,7 @@
 #ifndef IA_ISP_BXT_DEPRECATED_H_
 #define IA_ISP_BXT_DEPRECATED_H_
 
-#include "rk_aiq_types.h"
+#include "ia_aiq_types.h"
 #include "ia_types.h"
 #include "ia_isp_bxt_types.h"
 
@@ -34,7 +34,7 @@ LIBEXPORT ia_err
 ia_isp_bxt_statistics_convert_awb_from_binary(
     ia_isp_bxt *ia_isp_bxt,
     const ia_binary_data *statistics,
-    rk_aiq_rgbs_grid **out_rgbs_grid);
+    ia_aiq_rgbs_grid **out_rgbs_grid);
 
 LIBEXPORT ia_err
 ia_isp_bxt_statistics_convert_awb(
@@ -53,7 +53,7 @@ ia_isp_bxt_statistics_convert_awb(
     void *sat_ratio_1,
     void *sat_ratio_2,
     void *sat_ratio_3,
-    rk_aiq_rgbs_grid **out_rgbs_grid);
+    ia_aiq_rgbs_grid **out_rgbs_grid);
 
 #ifdef __cplusplus
 }

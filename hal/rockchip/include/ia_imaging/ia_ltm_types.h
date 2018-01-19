@@ -16,7 +16,7 @@
 
 /*!
  * \file ia_ltm_types.h
- * \brief Definitions of input/output structures of the Rockchip local tone mapping library.
+ * \brief Definitions of input/output structures of the Intel local tone mapping library.
  */
 
 #ifndef _IA_LTM_TYPES_H_

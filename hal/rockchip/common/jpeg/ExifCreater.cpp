@@ -483,7 +483,7 @@ void ExifCreater::writeMarkerSizeToBuf(unsigned char *ptrTo, unsigned int size)
  *
  * \param pStartApp2 [IN] APP2 start address
  * \param exifInfo [IN] Data to be written
- * \param writeId [IN] Whether to write the Rockchip Makernote ID string.
+ * \param writeId [IN] Whether to write the Intel Makernote ID string.
  * \param size [OUT] Total size after APP2 is written
  */
 exif_status ExifCreater::makeApp2(void* pStartApp2, size_t& size, exif_attribute_t *exifInfo, bool writeId)

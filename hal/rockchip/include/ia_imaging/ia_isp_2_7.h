@@ -26,7 +26,7 @@
 #include "ia_mkn_types.h"
 #include "ia_abstraction.h"
 #include "ia_types.h"
-#include "rk_aiq_types.h"
+#include "ia_aiq_types.h"
 #include "ia_isp_types.h"
 #include "ia_cmc_types.h"
 
@@ -83,14 +83,14 @@ ia_isp_2_7_deinit(ia_isp *ia_isp);
  */
 typedef struct
 {
-    rk_aiq_frame_use frame_use;                      /*!< Mandatory. Target frame type of the AIC calculations (Preview, Still, video etc.). */
-    rk_aiq_frame_params *sensor_frame_params;        /*!< Mandatory. Sensor frame parameters. Describe frame scaling/cropping done in sensor. */
-    rk_aiq_exposure_parameters *exposure_results;    /*!< Mandatory. Exposure parameters which are to be used to calculate next ISP parameters. */
-    rk_aiq_awb_results *awb_results;                 /*!< Mandatory. WB results which are to be used to calculate next ISP parameters (WB gains, color matrix,etc). */
-    rk_aiq_gbce_results *gbce_results;               /*!< Mandatory. GBCE Gamma tables which are to be used to calculate next ISP parameters.
+    ia_aiq_frame_use frame_use;                      /*!< Mandatory. Target frame type of the AIC calculations (Preview, Still, video etc.). */
+    ia_aiq_frame_params *sensor_frame_params;        /*!< Mandatory. Sensor frame parameters. Describe frame scaling/cropping done in sensor. */
+    ia_aiq_exposure_parameters *exposure_results;    /*!< Mandatory. Exposure parameters which are to be used to calculate next ISP parameters. */
+    ia_aiq_awb_results *awb_results;                 /*!< Mandatory. WB results which are to be used to calculate next ISP parameters (WB gains, color matrix,etc). */
+    ia_aiq_gbce_results *gbce_results;               /*!< Mandatory. GBCE Gamma tables which are to be used to calculate next ISP parameters.
                                                           If NULL pointer is passed, AIC will use static gamma table from the CPF.  */
-    rk_aiq_pa_results *pa_results;                   /*!< Mandatory. Parameter adaptor results from AIQ. */
-    rk_aiq_sa_results *sa_results;                   /*!< Mandatory. Shading adaptor results from AIQ. */
+    ia_aiq_pa_results *pa_results;                   /*!< Mandatory. Parameter adaptor results from AIQ. */
+    ia_aiq_sa_results *sa_results;                   /*!< Mandatory. Shading adaptor results from AIQ. */
     uint32_t isp_vamem_type;                         /*!< Mandatory. ISP vamem type. */
     ia_isp_feature_setting nr_setting;               /*!< Mandatory. Feature setting for noise reduction algorithms. */
     ia_isp_feature_setting ee_setting;               /*!< Mandatory. Feature setting for edge enhancement algorithms. */
@@ -100,7 +100,7 @@ typedef struct
     char manual_saturation;                          /*!< Optional. Manual saturation value range [-128,127]. */
     ia_isp_effect effects;                           /*!< Optional. Manual setting for special effects. Combination of ia_isp_effect enums.*/
     bool reduced_range_yuv;                          /*!< Mandatory. false configures ISP to output full YUV range data [0,255], true configures ISP to output BT601 reduced YUV range data. */
-    rk_aiq_frame_params *isp_frame_params;           /*!< Optional. Image output resolution and information about scaling done for the image in the ISP. NULL if not available. */
+    ia_aiq_frame_params *isp_frame_params;           /*!< Optional. Image output resolution and information about scaling done for the image in the ISP. NULL if not available. */
     int *custom_tunings_list;                        /*!< Optional. Array of indices for tunings selected by the user. Tunings are applied in the order they
                                                           are listed in the array. Indices must match ISP tunings defined in CPF. Index 0 must be last
                                                           in the list, which indicates the end of custom tunings. */
@@ -142,17 +142,17 @@ ia_isp_2_7_run(ia_isp *ia_isp,
  *                           Statistics in ISP specific format.
  * \param[out] out_rgbs_grid Mandatory.\n
  *                           Pointer's pointer where address of converted statistics are stored.
- *                           Converted RGBS grid statistics. Output can be directly used as input in function rk_aiq_statistics_set.
+ *                           Converted RGBS grid statistics. Output can be directly used as input in function ia_aiq_statistics_set.
  * \param[out] out_af_grid   Mandatory.\n
  *                           Pointer's pointer where address of converted statistics are stored.
- *                           Converted AF grid statistics. Output can be directly used as input in function rk_aiq_statistics_set.
+ *                           Converted AF grid statistics. Output can be directly used as input in function ia_aiq_statistics_set.
  * \return                   Error code.
  */
 LIBEXPORT ia_err
 ia_isp_2_7_statistics_convert(ia_isp *ia_isp,
     void *statistics,
-    rk_aiq_rgbs_grid **out_rgbs_grid,
-    rk_aiq_af_grid **out_af_grid);
+    ia_aiq_rgbs_grid **out_rgbs_grid,
+    ia_aiq_af_grid **out_af_grid);
 
 #ifdef __cplusplus
 }
