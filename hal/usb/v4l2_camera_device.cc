@@ -350,7 +350,7 @@ int V4L2CameraDevice::GetNextFrameBuffer(uint32_t* buffer_id,
   *data_size = buffer.bytesused;
 
   struct timeval tv = buffer.timestamp;
-  *timestamp = tv.tv_sec * 1'000'000'000LL + tv.tv_usec * 1000;
+  *timestamp = tv.tv_sec * 1000000000LL + tv.tv_usec * 1000;
 
   buffers_at_client_[buffer.index] = true;
 
