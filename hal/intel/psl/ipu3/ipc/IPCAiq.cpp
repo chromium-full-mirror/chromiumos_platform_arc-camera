@@ -345,6 +345,13 @@ bool IPCAiq::clientFlattenStat(uintptr_t aiq, const ia_aiq_statistics_input_para
         flattenPaResults(*base->frame_pa_parameters, &input->frame_pa_parameters);
     }
 
+    if (base->faces) {
+        input->faces.base = *base->faces;
+        for (int i = 0; i < input->faces.base.num_faces; i++) {
+            input->faces.faces[i] = *(base->faces->faces + i);
+        }
+    }
+
     if (base->awb_results) {
         input->awb_results = *base->awb_results;
     }
@@ -433,6 +440,11 @@ bool IPCAiq::serverUnflattenStat(const set_statistics_params& inParams, ia_aiq_s
     if (base->frame_pa_parameters) {
         unflattenPaResults(&input->frame_pa_parameters);
         base->frame_pa_parameters = &input->frame_pa_parameters.base;
+    }
+
+    if (base->faces) {
+        input->faces.base.faces = input->faces.faces;
+        base->faces = &input->faces.base;
     }
 
     if (base->awb_results) {
