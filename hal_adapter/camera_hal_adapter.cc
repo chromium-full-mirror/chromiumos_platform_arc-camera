@@ -116,6 +116,10 @@ int32_t CameraHalAdapter::OpenDevice(
   std::tie(camera_module, internal_camera_id) =
       GetInternalModuleAndId(camera_id);
 
+  LOGF(INFO) << "camera_id = " << camera_id
+             << ", camera_module = " << camera_module->common.name
+             << ", internal_camera_id = " << internal_camera_id;
+
   if (!camera_module) {
     return -EINVAL;
   }
@@ -577,6 +581,7 @@ int CameraHalAdapter::GetExternalId(int module_id, int camera_id) {
 void CameraHalAdapter::CloseDevice(int32_t camera_id) {
   VLOGF_ENTER();
   DCHECK(camera_module_thread_.task_runner()->BelongsToCurrentThread());
+  LOGF(INFO) << "camera_id = " << camera_id;
   if (device_adapters_.find(camera_id) == device_adapters_.end()) {
     LOGF(ERROR) << "Failed to close camera device " << camera_id
                 << ": device is not opened";
