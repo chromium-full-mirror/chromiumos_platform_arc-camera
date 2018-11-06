@@ -31,6 +31,7 @@
       ],
       'sources': [
         '../common/ipc_util.cc',
+        '../common/utils/camera_config.cc',
         '../common/utils/camera_hal_enumerator.cc',
         '../mojo/CameraMetadataTagsVerifier.cc',
         '../mojo/algorithm/camera_algorithm.mojom',
