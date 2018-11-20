@@ -20,12 +20,6 @@ const char kCrosCameraConfigPathString[] = "/etc/camera/camera_config.json";
 // USB HAL (won't fallback to SW encode/decode).
 const char kCrosForceJpegHardwareEncodeOption[] = "force_jpeg_hw_enc";
 const char kCrosForceJpegHardwareDecodeOption[] = "force_jpeg_hw_dec";
-
-// boolean value for specify enable/disable camera of target facing in camera
-// service.
-const char kCrosEnableFrontCameraOption[] = "enable_front_camera";
-const char kCrosEnableBackCameraOption[] = "enable_back_camera";
-const char kCrosEnableExternalCameraOption[] = "enable_external_camera";
 // ------End configuration for |kCrosCameraTestConfigPathString|-------
 
 // ------Configuration for |kCrosCameraConfigPathString|-------

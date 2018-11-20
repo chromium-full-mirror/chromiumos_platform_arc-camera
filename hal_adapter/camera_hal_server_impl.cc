@@ -130,12 +130,6 @@ void CameraHalServerImpl::RegisterCameraHal() {
 
   std::vector<camera_module_t*> camera_modules;
   CameraConfig config(constants::kCrosCameraTestConfigPathString);
-  bool enable_front =
-           config.GetBoolean(constants::kCrosEnableFrontCameraOption, true),
-       enable_back =
-           config.GetBoolean(constants::kCrosEnableBackCameraOption, true),
-       enable_external =
-           config.GetBoolean(constants::kCrosEnableExternalCameraOption, true);
 
   for (const auto& dll : GetCameraHalPaths()) {
     LOGF(INFO) << "Try to load camera hal " << dll.value();
