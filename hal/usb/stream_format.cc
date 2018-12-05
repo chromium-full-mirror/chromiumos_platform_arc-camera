@@ -7,8 +7,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <string>
 #include <tuple>
 
+#include <chromeos-config/libcros_config/cros_config.h>
 #include <linux/videodev2.h>
 #include <system/graphics.h>
 
@@ -135,6 +138,21 @@ SupportedFormats GetQualifiedFormats(
         }
       }
       qualified_formats.push_back(supported_format);
+    }
+  }
+
+  // Only sort resolutions for nami in M71 branch.
+  auto config = std::make_unique<brillo::CrosConfig>();
+  if (config->InitModel()) {
+    std::string name;
+    if (config->GetString("/identity", "platform-name", &name) &&
+        name == "Nami") {
+      // Sort the resolution from high to low for easier reading and consistent
+      // of different camera modules.
+      // CTS uses the first 2 resolutions to create streams. It also let CTS
+      // choose high resolutions.
+      std::sort(qualified_formats.begin(), qualified_formats.end());
+      std::reverse(qualified_formats.begin(), qualified_formats.end());
     }
   }
   return qualified_formats;

@@ -13,6 +13,7 @@
         'libcamera_exif',
         'libcamera_metadata',
         'libcamera_timezone',
+        'libcros_config',
         'libjda',
         'libsync',
         'libyuv',
