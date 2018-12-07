@@ -80,6 +80,7 @@
         'common/gcss/gcss_item.cpp',
         'common/gcss/gcss_utils.cpp',
         'common/gcss/graph_query_manager.cpp',
+        'common/cameraOrientationDetector/CameraOrientationDetector.cpp',
         'common/imageProcess/ColorConverter.cpp',
         'common/jpeg/EXIFMaker.cpp',
         'common/jpeg/EXIFMetaData.cpp',
