@@ -14,7 +14,6 @@
 
 #include <base/files/scoped_file.h>
 
-#include "cros-camera/timezone.h"
 #include "hal/usb_v1/camera_device_delegate.h"
 
 namespace arc {
@@ -53,21 +52,11 @@ class V4L2CameraDevice : public CameraDeviceDelegate {
   // is found. Otherwise, returns empty strings.
   std::pair<std::string, std::string> FindExternalCamera();
 
-  // Get power frequency supported from device.
-  cros::PowerLineFrequency GetPowerLineFrequency(
-      const std::string& device_path);
-
-  // Set power frequency supported from device.
-  int SetPowerLineFrequency(cros::PowerLineFrequency setting);
-
   // The number of video buffers we want to request in kernel.
   const int kNumVideoBuffers = 4;
 
   // The opened device fd.
   base::ScopedFD device_fd_;
-
-  // Power line frequency.
-  cros::PowerLineFrequency power_line_frequency_;
 
   // StreamOn state
   bool stream_on_;
